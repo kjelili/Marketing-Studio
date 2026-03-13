@@ -1,480 +1,334 @@
-# 🎨 Direct-to-Mood Marketing Studio
+# Direct-to-Mood Marketing Studio
 
-> **Your AI Creative Director for Unified Brand Campaigns**
+> **An AI Creative Director agent that thinks, plans, critiques, and generates complete marketing campaigns — text, images, audio, and video — in a single, fluid output stream.**
 
-[![Gemini Live Agent Challenge](https://img.shields.io/badge/GeminiLiveAgent-Challenge-blue)](https://aistudio.google.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-
----
-
-## 🌐 Live Deployments
-
-**Try the app now — no installation required:**
-
-| Platform | URL | Region |
-|----------|-----|--------|
-| **Google Cloud Run** | [https://gcloud-830001350094.europe-west1.run.app](https://gcloud-830001350094.europe-west1.run.app) | Europe (europe-west1) |
-| **Vercel** | [https://marketing-studio-jade.vercel.app](https://marketing-studio-jade.vercel.app/) | Global Edge |
-
-Both deployments are production-ready and fully functional. Choose either link to generate cohesive marketing campaigns powered by Google Gemini AI.
+[![Gemini Live Agent Challenge](https://img.shields.io/badge/Gemini_Live_Agent-Challenge-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/competition/projects/direct-to-mood-marketing-studio)
+[![Google Cloud Run](https://img.shields.io/badge/Google_Cloud-Run-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)](https://gcloud-830001350094.europe-west1.run.app)
+[![Vercel](https://img.shields.io/badge/Vercel-Deployed-000?style=for-the-badge&logo=vercel&logoColor=white)](https://marketing-studio-jade.vercel.app/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
 ---
 
-## 📋 Table of Contents
+## Live Deployments
 
-- [Overview](#-overview)
-- [The Problem We Solve](#-the-problem-we-solve)
-- [Our Solution](#-our-solution)
-- [Features](#-features)
-- [Quick Start](#-quick-start)
-- [Deployment](#-deployment)
-- [Technical Architecture](#-technical-architecture)
-- [API Reference](#-api-reference)
-- [Environment Variables](#-environment-variables)
-- [Project Structure](#-project-structure)
-- [Documentation](#-documentation)
-- [Development](#-development)
-- [Troubleshooting](#-troubleshooting)
-- [Quality Metrics](#-quality-metrics)
-- [Security & Privacy](#-security--privacy)
-- [License](#-license)
+| Platform | URL |
+|----------|-----|
+| **Google Cloud Run** | [gcloud-830001350094.europe-west1.run.app](https://gcloud-830001350094.europe-west1.run.app) |
+| **Vercel** | [marketing-studio-jade.vercel.app](https://marketing-studio-jade.vercel.app/) |
 
 ---
 
-## 🎯 Overview
+## What This App Does
 
-**Direct-to-Mood Marketing Studio** eliminates the frustration of jumping between multiple AI tools to create cohesive marketing campaigns. As an AI-powered Creative Director, it generates unified campaign assets where the visuals perfectly match the mood of your copy — all in a single pass.
+Direct-to-Mood Marketing Studio is an **agentic, multimodal marketing campaign generator** built for the **#GeminiLiveAgentChallenge**. It acts as an AI Creative Director that:
 
-Built for the **#GeminiLiveAgentChallenge**, this application leverages Google's Gemini API to produce production-ready marketing materials in under 3 seconds.
+1. **Extracts a brand brief** from your business description (and optional logo upload)
+2. **Drafts interleaved text + image assets** using Gemini's native `TEXT + IMAGE` modalities in a single generation call
+3. **Scores the draft** with an automated QA agent (cohesion + compliance)
+4. **Auto-revises** if the quality score is below threshold
+5. **Generates a cinematic video clip** using Veo 3.1 — automatically, after the campaign is ready
+6. **Streams everything in real-time** via Server-Sent Events so the user watches the campaign materialize live
 
----
-
-## ❌ The Problem We Solve
-
-- **Context Switching**: Small business owners juggle 5+ different AI tools (ChatGPT, Midjourney, Runway, Canva, etc.)
-- **Inconsistent Branding**: Each tool produces assets with different moods, tones, and visual languages
-- **Time Consuming**: 2+ hours spent generating, coordinating, and iterating on mismatched assets
-
----
-
-## ✅ Our Solution
-
-- **Single Platform**: Generate all marketing assets simultaneously in one API call
-- **Mood Cohesion**: Gemini ensures image prompts reference copy lighting; video prompts mirror image mood
-- **Lightning Fast**: Complete 4-asset campaigns in under 3 seconds
-- **Production-Ready**: Prompts include lens specs, colour grading, and shot composition — ready for Imagen, Veo, or Midjourney
-
-### Impact
-
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| Time to complete campaign | ~2 hours | ~3 minutes | **40× faster** |
-| Tools required | 5+ | 1 | Single platform |
-| Brand cohesion | Inconsistent | Unified | Mood-matched |
+All assets — hooks, hero images, storytelling copy, lifestyle visuals, CTAs, and video — are generated in **one click** with no mockups and no manual steps between them.
 
 ---
 
-## ✨ Features
+## Key Features
 
-### Core Capabilities
+### Agentic Pipeline (Multi-Step Reasoning)
 
-- **🎨 Mood-Based Generation**: 6 carefully crafted mood profiles that drive all asset generation
-- **⚡ Lightning Fast**: < 3 second end-to-end generation time
-- **🔗 True Interleaving**: Image prompts explicitly reference text mood; video prompts mirror image lighting
-- **📋 Easy Export**: Copy individual assets to clipboard or export entire campaign
-- **📱 Fully Responsive**: Optimised for desktop, tablet, and mobile
-- **♿ Accessible**: WCAG AA compliant with keyboard navigation and screen reader support
+The backend executes a structured creative workflow, not a single prompt:
 
-### 6 Mood Presets
+| Step | What Happens | Model |
+|------|-------------|-------|
+| Brief Extraction | Parses brand voice, audience, tone, palette from business info + optional logo | `gemini-2.5-flash` |
+| Interleaved Draft | Generates text and images in alternating sequence within one API call | `gemini-2.5-flash-image` |
+| QA Scoring | Evaluates cohesion (0–10), compliance (0–10), issues, and suggested fixes | `gemini-2.5-flash` |
+| Auto-Revision | If cohesion < 8, regenerates with targeted fixes (transparent to user) | `gemini-2.5-flash-image` |
+| Video Generation | Creates a cinematic video clip from the campaign's CTA copy | `veo-3.1-generate-preview` |
 
-| Mood | Description |
-|------|-------------|
-| **Elegant & Sophisticated** | Refined luxury appeal |
-| **Energetic & Bold** | Dynamic and vibrant |
-| **Minimal & Clean** | Simple and modern |
-| **Warm & Inviting** | Friendly and approachable |
-| **Dramatic & Intense** | High contrast and moody |
-| **Playful & Fun** | Bright and cheerful |
+Each step streams status updates, director notes, and assets to the frontend in real-time.
 
-### Generated Asset Types
+### Native Interleaved Output
 
-| # | Asset | Type | Description |
-|---|-------|------|-------------|
-| 1 | **Hook** | Text | Attention-grabbing opening copy that establishes brand voice |
-| 2 | **Hero Visual** | Image Prompt | Professional photography prompt with lens specs, lighting, and mood palette |
-| 3 | **Storytelling** | Text | Value proposition narrative that builds emotional connection |
-| 4 | **Call to Action** | Video Prompt | 10-second video ad specification with shot list and transitions |
+Gemini generates text and images in a single `generateContent` call with `responseModalities: [TEXT, IMAGE]`. This is not prompt chaining — it is true interleaved multimodal generation where images are informed by the text context that precedes them.
 
-### Technical Features
+### Multimodal Input
 
-- **Structured JSON Output**: Schema-enforced responses ensure UI stability
-- **Visual Cohesion**: Gemini generates all assets in a single pass with explicit cross-references
-- **Model Fallback Chain**: Tries `gemini-2.5-flash` → `gemini-2.0-flash` → `gemini-2.0-flash-lite` automatically
-- **Production-Grade Prompts**: Include aperture, focal length, colour grading, and shot composition
-- **Graceful Error Handling**: Fallback generation if JSON parsing fails
+Users can upload a brand logo or product image. The image is sent as `inlineData` alongside the text prompt, so Gemini incorporates the brand's visual identity into every generated asset.
+
+### Video Generation (Veo 3.1)
+
+After text + image assets are finalized, the app automatically generates an 8-second cinematic video clip using Gemini's `generateVideos` API. The video is silent (visuals only); the frontend provides a **"Play Video with Full Narration"** button that syncs browser-based speech synthesis to the video playback, guaranteeing complete voiceover every time.
+
+### Guardrails
+
+| Control | Description |
+|---------|-------------|
+| **Channel** | Tailors tone for Instagram, TikTok, LinkedIn, YouTube, or general |
+| **Reading Level** | Simple, general, or advanced vocabulary |
+| **Taboo Words** | Comma-separated list of banned terms — enforced during QA |
+| **Auto-Revise** | Toggle automatic revision when QA score is low |
+
+### Campaign & Storyboard Modes
+
+- **Campaign mode**: Hook → Hero Image → Story → Lifestyle Image → CTA
+- **Storyboard mode**: Shot-by-shot visual sequence with frame descriptions and matching images
+
+### Per-Asset Controls
+
+- **Regenerate** any individual image without regenerating the whole campaign
+- **Refine** any text asset with natural-language feedback
+- **Share** any individual asset to social media (or copy to clipboard)
+
+### Export
+
+- **Download Bundle (.zip)**: Contains `campaign.json`, `campaign.md`, all images as PNGs, and the generated MP4 video
+- **Play Voiceover**: Browser speech synthesis reads all text assets aloud
+- **Share Social Caption**: Auto-generates platform-appropriate caption with hashtags
 
 ---
 
-## 🚀 Quick Start
+## Technology Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 18 (standalone, no build step), Babel Standalone, Tailwind CSS, JSZip, Web Speech API |
+| **Backend** | Node.js 18+, Express.js |
+| **AI — Text + Images** | Google Gemini API (`@google/genai` SDK) — `gemini-2.5-flash` and `gemini-2.5-flash-image` with `Modality.TEXT` + `Modality.IMAGE` |
+| **AI — Video** | Gemini Veo 3.1 (`veo-3.1-generate-preview`) via `ai.models.generateVideos` |
+| **Streaming** | Server-Sent Events (SSE) |
+| **Deployment** | Google Cloud Run (Docker), Vercel (serverless) |
+
+---
+
+## Architecture
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│                          User's Browser                              │
+│                                                                       │
+│  React 18 SPA ──── SSE Stream ──── Web Speech API ──── JSZip Export  │
+└────────────────────────┬──────────────────────────────────────────────┘
+                         │  POST /api/generate-campaign (SSE)
+                         │  POST /api/generate-video
+                         │  POST /api/regen-image (SSE)
+                         │  POST /api/refine-campaign (SSE)
+                         ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                    Node.js / Express Backend                          │
+│                                                                       │
+│  ┌──────────┐   ┌──────────────┐   ┌────────┐   ┌──────────────┐    │
+│  │  Brief    │──▶│  Interleaved │──▶│   QA   │──▶│ Auto-Revise  │    │
+│  │  Extract  │   │  Draft       │   │  Score │   │ (if needed)  │    │
+│  └──────────┘   └──────────────┘   └────────┘   └──────────────┘    │
+│                                                         │             │
+│                                              ┌──────────▼──────────┐ │
+│                                              │  Video Generation   │ │
+│                                              │  (Veo 3.1)          │ │
+│                                              └─────────────────────┘ │
+└────────────────────────┬──────────────────────────────────────────────┘
+                         │
+                         ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│                      Google Cloud (Gemini API)                        │
+│                                                                       │
+│   gemini-2.5-flash          gemini-2.5-flash-image       veo-3.1     │
+│   (brief, QA, refine)      (interleaved TEXT+IMAGE)      (video)     │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Quick Start
 
 ### Prerequisites
 
-- **Node.js** v18 or higher — [Download here](https://nodejs.org/)
-- **Gemini API Key** — [Get free key](https://aistudio.google.com/apikey)
+- **Node.js** v18+ — [nodejs.org](https://nodejs.org/)
+- **Gemini API Key** — [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
-### Installation & Setup
+### Setup
 
 ```bash
-# 1. Clone or navigate to project folder
-cd marketing-studio
-
-# 2. Install dependencies
+git clone https://github.com/kjelili/Marketing-Studio.git
+cd Marketing-Studio
 npm install
-
-# 3. Create .env from template
 cp .env.example .env
-
-# 4. Add your Gemini API key to .env
-#    GEMINI_API_KEY=your_actual_key_here
-
-# 5. Start the server
+# Edit .env and add: GEMINI_API_KEY=your_key_here
 npm start
-
-# 6. Open http://localhost:8080 in your browser
+# Open http://localhost:8080
 ```
 
 ### Using the App
 
-1. **Describe Your Business** — Enter product details, target audience, and value proposition
-2. **Select Campaign Mood** — Choose from 6 curated moods
-3. **Generate Campaign** — Click "Generate Campaign" and watch 4 interleaved assets appear in ~3 seconds
-4. **Export & Use** — Copy individual assets or export all. Paste prompts into Imagen, Veo, Midjourney, or Runway
+1. **Describe your business** — or pick a demo preset (coffee shop, skincare brand, etc.)
+2. **Upload a logo** (optional) — for multimodal brand input
+3. **Select a mood** — Elegant, Energetic, Minimal, Warm, Dramatic, or Playful
+4. **Set guardrails** — channel, reading level, taboo words
+5. **Click Generate** — watch the agentic pipeline run: brief → draft → QA → revision → video
+6. **Interact** — regenerate individual images, refine text, share assets, or download the full bundle
 
-### Development Mode
+---
 
-```bash
-# Auto-restart on file changes
-npm run dev
+## API Reference
+
+### `GET /api/health`
+
+Returns server status, platform, SDK version, and available features.
+
+### `POST /api/generate-campaign` (SSE stream)
+
+Main endpoint. Executes the full agentic pipeline and streams results.
+
+**Request body:**
+
+```json
+{
+  "businessInfo": "A cozy coffee shop in Austin for remote workers...",
+  "mood": "warm",
+  "mode": "campaign",
+  "channel": "instagram",
+  "readingLevel": "general",
+  "bannedWords": "cheap,discount",
+  "autoRevise": true,
+  "brandImageDataUrl": "data:image/png;base64,..."
+}
+```
+
+**SSE events emitted:** `run`, `step`, `director_note`, `brief`, `status`, `model`, `asset` (text or image), `qa`, `replace_all`, `complete`, `error`.
+
+### `POST /api/regen-image` (SSE stream)
+
+Regenerates a single image asset using Gemini interleaved output.
+
+### `POST /api/refine-campaign` (SSE stream)
+
+Multi-turn refinement — send natural language feedback and receive updated assets.
+
+### `POST /api/generate-video`
+
+Generates an MP4 video clip using Veo 3.1. Returns `{ videoUrl }`.
+
+**Request body:**
+
+```json
+{
+  "videoPrompt": "Your CTA or script text",
+  "mood": "warm",
+  "channel": "instagram",
+  "durationSeconds": 8,
+  "aspectRatio": "16:9",
+  "resolution": "1080p"
+}
 ```
 
 ---
 
-## ☁️ Deployment
+## Environment Variables
 
-### Live URLs
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GEMINI_API_KEY` | Yes | — | From [Google AI Studio](https://aistudio.google.com/apikey) |
+| `PORT` | No | `8080` | Server port |
+| `NODE_ENV` | No | `development` | `production` enables Cloud Run detection |
+| `ALLOWED_ORIGINS` | No | `*` | CORS origins (comma-separated) |
 
-- **Google Cloud Run**: [https://gcloud-830001350094.europe-west1.run.app](https://gcloud-830001350094.europe-west1.run.app)
-- **Vercel**: [https://marketing-studio-jade.vercel.app](https://marketing-studio-jade.vercel.app/)
+---
 
-### Deploy to Google Cloud Run
+## Project Structure
 
-#### One-Click Deploy (PowerShell)
-
-```powershell
-.\deploy-gcp.ps1
+```
+Marketing-Studio/
+├── index.html            # React 18 frontend (single-file SPA)
+├── server.js             # Express backend (agentic pipeline + Gemini integration)
+├── package.json          # Dependencies and scripts
+├── .env.example          # Environment variable template
+├── Dockerfile            # Cloud Run container
+├── vercel.json           # Vercel serverless routing
+├── deploy-gcp.ps1       # One-click GCP deployment (PowerShell)
+├── app.yaml              # App Engine config (alternative)
+├── videos/               # Auto-created directory for generated MP4s
+└── README.md
 ```
 
-The script handles authentication, API enablement, and deployment automatically.
+---
 
-#### Manual Deploy
+## Deployment
+
+### Google Cloud Run
 
 ```bash
-# 1. Authenticate
 gcloud auth login
 gcloud config set project YOUR_PROJECT_ID
-
-# 2. Enable APIs
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
 
-# 3. Deploy
 gcloud run deploy marketing-studio \
   --source . \
   --region europe-west1 \
   --allow-unauthenticated \
-  --set-env-vars "GEMINI_API_KEY=your_key,NODE_ENV=production,ALLOWED_ORIGINS=*" \
+  --set-env-vars "GEMINI_API_KEY=your_key,NODE_ENV=production" \
   --memory 512Mi --cpu 1
 ```
 
-**Cloud Run Free Tier**: 2 million requests/month, 360,000 GB-seconds memory, 180,000 vCPU-seconds — typically **$0** for demos.
+Or use the one-click script: `.\deploy-gcp.ps1`
 
-### Deploy to Vercel
+### Vercel
 
 ```bash
-# Install Vercel CLI (if needed)
 npm i -g vercel
-
-# Deploy
 vercel
-
-# Set environment variable in Vercel Dashboard:
-# GEMINI_API_KEY = your_api_key
-```
-
-The project includes `vercel.json` for serverless routing — API routes go to `server.js`, static assets to `index.html`.
-
-### Deployment Files
-
-| File | Purpose |
-|------|---------|
-| `Dockerfile` | Container image for Cloud Run |
-| `.dockerignore` | Excludes unnecessary files from container |
-| `.gcloudignore` | Excludes files from source upload |
-| `vercel.json` | Vercel serverless routing config |
-| `app.yaml` | Alternative App Engine configuration |
-| `deploy-gcp.ps1` | One-click PowerShell deployment script |
-
----
-
-## 🏗️ Technical Architecture
-
-### High-Level Overview
-
-```
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   Frontend       │     │   Backend        │     │   Google Cloud   │
-│   (React 18)     │────▶│   (Node/Express) │────▶│   Gemini API     │
-│   index.html     │◀────│   server.js      │◀────│   v1beta         │
-│                  │     │   reads .env     │     │                  │
-└──────────────────┘     └──────────────────┘     └──────────────────┘
-       Browser              Cloud Run / Vercel       Generative Language API
-```
-
-### Technology Stack
-
-| Layer | Technology |
-|-------|-------------|
-| **Frontend** | React 18 (standalone, no build), Babel Standalone (in-browser JSX), Tailwind CSS (CDN) |
-| **Fonts** | Outfit, Crimson Pro (Google Fonts) |
-| **Backend** | Node.js 18+, Express.js |
-| **HTTP Client** | Axios |
-| **Env Config** | dotenv |
-| **CORS** | cors |
-| **AI** | Google Gemini API (Generative Language API v1beta) |
-| **Dev** | nodemon (auto-restart) |
-
-### Design System
-
-- **Color Palette**: Deep purple to pink gradients with glass morphism
-- **Typography**: Outfit (display) + Crimson Pro (accent)
-- **Effects**: Glass morphism, gradient overlays, smooth animations
-- **Responsive**: Mobile-first, breakpoints at 768px and 1024px
-
----
-
-## 📡 API Reference
-
-### Endpoints
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/` | GET | Serve frontend application |
-| `/api/health` | GET | Health check (reports deployment environment) |
-| `/api/generate-campaign` | POST | Generate 4-asset campaign from business info + mood |
-
-### Generate Campaign
-
-**Request:**
-
-```json
-{
-  "businessInfo": "A cozy neighborhood coffee shop in Austin targeting remote workers...",
-  "mood": "warm"
-}
-```
-
-**Response:**
-
-```json
-{
-  "campaign_title": "The Daily Grind Experience",
-  "assets": [
-    { "type": "text", "content": "...", "styling_notes": "..." },
-    { "type": "image_prompt", "content": "...", "styling_notes": "..." },
-    { "type": "text", "content": "...", "styling_notes": "..." },
-    { "type": "video_prompt", "content": "...", "styling_notes": "..." }
-  ]
-}
-```
-
-**cURL Example:**
-
-```bash
-curl -X POST http://localhost:8080/api/generate-campaign \
-  -H "Content-Type: application/json" \
-  -d '{"businessInfo":"Eco-friendly water bottles for athletes","mood":"energetic"}'
+# Set GEMINI_API_KEY in Vercel Dashboard → Settings → Environment Variables
 ```
 
 ---
 
-## 🔧 Environment Variables
+## Proof of Google Cloud Deployment
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GEMINI_API_KEY` | Yes | — | API key from [Google AI Studio](https://aistudio.google.com/apikey) |
-| `PORT` | No | 8080 | Server port |
-| `NODE_ENV` | No | development | `development` or `production` |
-| `ALLOWED_ORIGINS` | No | — | CORS origins (comma-separated), or `*` for all |
+The backend runs on **Google Cloud Run** in `europe-west1`:
 
-**Example `.env`:**
-
-```env
-GEMINI_API_KEY=your_api_key_here
-PORT=8080
-NODE_ENV=development
-ALLOWED_ORIGINS=http://localhost:8080,https://marketing-studio-jade.vercel.app
-```
+- **Live URL**: [gcloud-830001350094.europe-west1.run.app](https://gcloud-830001350094.europe-west1.run.app)
+- **Health endpoint**: [gcloud-830001350094.europe-west1.run.app/api/health](https://gcloud-830001350094.europe-west1.run.app/api/health) — returns `"platform": "Google Cloud Run"`
+- **Code proof**: [`server.js`](server.js) line 149 — `process.env.K_SERVICE ? 'Google Cloud Run' : 'local'` uses the Cloud Run-injected `K_SERVICE` environment variable
+- **Deployment config**: [`Dockerfile`](Dockerfile), [`deploy-gcp.ps1`](deploy-gcp.ps1)
 
 ---
 
-## 📂 Project Structure
+## Findings and Learnings
 
-```
-marketing-studio/
-├── index.html              # React 18 frontend (single-file app)
-├── server.js               # Express API server (Gemini integration)
-├── package.json            # Node.js dependencies
-├── .env.example            # Environment variable template
-├── Dockerfile              # Cloud Run container definition
-├── vercel.json             # Vercel serverless routing
-├── app.yaml                # App Engine config (alternative)
-├── deploy-gcp.ps1          # One-click GCP deployment script
-├── demo-video.html         # Interactive feature showcase
-├── README.md               # This file
-├── TECHNICAL_SPEC.md       # Architecture & design system
-├── DOCUMENTATION.md        # User guide
-├── DEPLOY_GCP.md           # GCP deployment guide
-├── PROJECT_SUMMARY.md      # Executive summary
-└── BUILD_VERIFICATION.md   # Testing results
-```
+### What Worked Well
 
----
+- **Gemini's interleaved `TEXT + IMAGE` modality** is genuinely powerful — generating text and images in a single call produces visually cohesive campaigns that feel like they were art-directed, not stitched together from separate tools.
+- **The agentic pipeline** (brief → draft → QA → revise) dramatically improved output quality. Having the AI critique its own work and iterate before presenting to the user is a major step above single-shot generation.
+- **SSE streaming** creates a compelling real-time experience. Users watch the Creative Director "think" — seeing director notes, brief extraction, and assets appear live builds trust and engagement.
 
-## 📚 Documentation
+### Challenges
 
-| File | Contents |
-|------|----------|
-| `README.md` | This file — overview, setup, deployment, reference |
-| `TECHNICAL_SPEC.md` | System architecture, component breakdown, design system |
-| `DOCUMENTATION.md` | User guide, usage instructions, design philosophy |
-| `PROJECT_SUMMARY.md` | Executive summary, innovation highlights, impact metrics |
-| `DEPLOY_GCP.md` | Step-by-step Google Cloud Run deployment guide |
-| `BUILD_VERIFICATION.md` | Testing results, quality metrics |
-| `demo-video.html` | Interactive feature showcase (opens in browser) |
+- **Gemini's JSON output reliability**: Even with `responseMimeType: 'application/json'`, Gemini occasionally wraps responses in markdown fences. The `extractJsonBlock` utility became essential for robust parsing.
+- **Veo 3.1 audio control**: Veo's internal voiceover cannot be precisely controlled for duration or completeness. The solution was to generate silent video (visuals only) and layer browser-based speech synthesis for guaranteed full narration.
+- **Image-only generation**: Requesting `Modality.IMAGE` alone from `generateContent` is unreliable. Requesting `[Modality.TEXT, Modality.IMAGE]` and extracting the image part proved far more consistent.
+
+### Key Technical Decisions
+
+- **Single-file frontend** (`index.html` with React 18 + Babel Standalone): Zero build step, instant deployment, no framework overhead. Trade-off: no TypeScript, no module bundling — acceptable for a challenge demo.
+- **`@google/genai` SDK** (not REST): Provides typed helpers for `generateContent`, `generateVideos`, and file operations, reducing boilerplate and error handling.
+- **Web Speech API for voiceover**: Browser-native TTS guarantees narration completion regardless of Veo's audio capabilities. The video provides cinematic visuals; the browser provides reliable speech.
 
 ---
 
-## 💻 Development
+## Security
 
-### Local URLs
-
-- **App**: `http://localhost:8080`
-- **Health**: `http://localhost:8080/api/health`
-
-### Scripts
-
-```bash
-npm start          # Production server
-npm run dev        # Development with auto-reload
-npm test           # Run tests (placeholder)
-```
-
-### Browser Support
-
-- ✅ Chrome 90+
-- ✅ Firefox 88+
-- ✅ Safari 14+
-- ✅ Edge 90+
-- ✅ Mobile Safari / Chrome Mobile
+- API key stored in `.env` / Cloud Run secrets — never sent to the browser
+- All Gemini calls proxied through Express (backend gateway pattern)
+- CORS configured per deployment
+- No user data stored; all API calls are ephemeral
+- Input sanitization and payload size limits on server
 
 ---
 
-## 🔧 Troubleshooting
+## License
 
-| Issue | Fix |
-|-------|-----|
-| `npm: command not found` | Install Node.js from https://nodejs.org/ and restart terminal |
-| `Cannot find module 'dotenv'` | Run `npm install` in the project folder |
-| `API Key: ✗ Missing` | Add `GEMINI_API_KEY=your_key` to `.env` file, restart server |
-| `models/gemini-... not found` | Ensure `server.js` uses `v1beta` endpoint and current model names |
-| `Failed to generate campaign` | Check API key validity, internet connection, and server logs |
-| `Port already in use` | Change `PORT=8081` in `.env` or kill the existing process |
-| `CORS policy violation` | Set `ALLOWED_ORIGINS=*` in `.env` for development |
-| `gcloud not found` | Install [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) |
-| Cloud Run build fails | Ensure `package.json`, `server.js`, `index.html` are in the folder |
+MIT — free to use, modify, and distribute.
 
 ---
 
-## 📊 Quality Metrics
-
-### Build Quality: 98/100
-
-| Category | Score |
-|----------|-------|
-| Functionality | 100/100 |
-| Performance | 98/100 |
-| Design | 100/100 |
-| Accessibility | 95/100 |
-| Code Quality | 97/100 |
-
-### Performance
-
-| Metric | Target | Achieved |
-|--------|--------|----------|
-| Page Load | < 2s | < 1s |
-| First Contentful Paint | < 1s | ~300ms |
-| Time to Interactive | < 2s | ~800ms |
-| Campaign Generation | < 3s | 2.5–3.5s |
-| Animation FPS | 60fps | 60fps stable |
-
----
-
-## 🔒 Security & Privacy
-
-### Security
-
-- ✅ API key stored in `.env` — never exposed to browser
-- ✅ Backend gateway pattern — all Gemini calls routed through Express
-- ✅ `.gitignore` prevents accidental key commits
-- ✅ CORS configuration restricts cross-origin access
-- ✅ Input sanitisation and length limits on server
-- ✅ HTTPS by default on Cloud Run and Vercel
-
-### Privacy
-
-- ✅ No user data stored on any server
-- ✅ No cookies, sessions, or analytics
-- ✅ All API calls are ephemeral
-- ✅ Business descriptions processed only for current generation
-
----
-
-## 🌟 What Makes This Special
-
-1. **True Interleaving** — Not separate assets, but a cohesive flow where each asset references the previous
-2. **Mood Consistency** — Visual prompts explicitly reference text mood, lighting, and colour vocabulary
-3. **40× Faster** — 2-hour manual workflow compressed to 3 minutes on a single platform
-4. **Production Quality** — Prompts include professional photography and cinematography specifications
-5. **Cloud-Native** — Deployed on Google Cloud Run and Vercel with zero-config
-6. **Validated Output** — Generated prompts tested against Imagen, Veo, and Midjourney
-
----
-
-## 📄 License
-
-Created for the **#GeminiLiveAgentChallenge**  
-Free to use, modify, and distribute under MIT License.
-
----
-
-## 🔗 Quick Links
-
-- **Live on Google Cloud**: [https://gcloud-830001350094.europe-west1.run.app](https://gcloud-830001350094.europe-west1.run.app)
-- **Live on Vercel**: [https://marketing-studio-jade.vercel.app](https://marketing-studio-jade.vercel.app/)
-- **Get Gemini API Key**: [Google AI Studio](https://aistudio.google.com/apikey)
-- **Repository**: [github.com/kjelili/marketing-studio](https://github.com/kjelili/marketing-studio)
-
----
-
-**Built with ❤️ for the #GeminiLiveAgentChallenge**
-
-*Version 2.0 · March 2026*
+**Built for the #GeminiLiveAgentChallenge** · [Google Cloud Run](https://gcloud-830001350094.europe-west1.run.app) · [Vercel](https://marketing-studio-jade.vercel.app/) · [GitHub](https://github.com/kjelili/Marketing-Studio)

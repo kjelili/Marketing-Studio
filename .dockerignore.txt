@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log
+.env
+.env.*
+.git
+.gitignore
+*.md
+demo-video.html
+documentation/
+BUILD_VERIFICATION.md
+TECHNICAL_SPEC.md
+PROJECT_SUMMARY.md
+DOCUMENTATION.md
+SETUP_GUIDE.md
+QUICK_START.md
+UPDATE_SUMMARY.md

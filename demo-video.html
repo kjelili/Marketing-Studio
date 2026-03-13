@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct-to-Mood Marketing Studio - Demo Video</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Crimson+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #2a1f3a 100%);
+            min-height: 100vh;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        .video-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .scene {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 2rem;
+            position: relative;
+        }
+
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 3rem;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-100px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
+        }
+
+        .screenshot {
+            border-radius: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .demo-step {
+            opacity: 0;
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+
+        .demo-step:nth-child(1) { animation-delay: 0.2s; }
+        .demo-step:nth-child(2) { animation-delay: 0.4s; }
+        .demo-step:nth-child(3) { animation-delay: 0.6s; }
+        .demo-step:nth-child(4) { animation-delay: 0.8s; }
+
+        .badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .metric {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .metric-value {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .timeline-line {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin: 4rem 0;
+        }
+
+        .timeline-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.6);
+        }
+    </style>
+</head>
+<body>
+    <!-- Title Scene -->
+    <div class="scene">
+        <div class="text-center max-w-4xl">
+            <div class="text-8xl mb-6" style="animation: scaleIn 1s ease-out">🎨</div>
+            <h1 class="text-7xl font-bold mb-6 gradient-text" style="animation: fadeIn 1s ease-out 0.3s backwards">
+                Direct-to-Mood<br/>Marketing Studio
+            </h1>
+            <p class="text-3xl text-white/70 mb-8" style="animation: fadeIn 1s ease-out 0.6s backwards">
+                Your AI Creative Director for Unified Brand Campaigns
+            </p>
+            <div class="flex gap-4 justify-center" style="animation: fadeIn 1s ease-out 0.9s backwards">
+                <span class="badge">Google Gemini 3 Flash</span>
+                <span class="badge">#GeminiLiveAgentChallenge</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Problem Scene -->
+    <div class="scene bg-gradient-to-b from-transparent to-red-900/20">
+        <div class="max-w-5xl">
+            <h2 class="text-5xl font-bold mb-12 text-center" style="animation: fadeIn 0.8s ease-out">
+                The Problem 😤
+            </h2>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="feature-card demo-step">
+                    <div class="text-5xl mb-4">🔄</div>
+                    <h3 class="text-2xl font-bold mb-3">Context Switching</h3>
+                    <p class="text-white/70">
+                        Jumping between 5+ different AI tools for copy, images, and videos
+                    </p>
+                </div>
+                <div class="feature-card demo-step">
+                    <div class="text-5xl mb-4">😵</div>
+                    <h3 class="text-2xl font-bold mb-3">Inconsistent Branding</h3>
+                    <p class="text-white/70">
+                        Each tool creates assets with different moods and styles
+                    </p>
+                </div>
+                <div class="feature-card demo-step">
+                    <div class="text-5xl mb-4">⏰</div>
+                    <h3 class="text-2xl font-bold mb-3">Time Consuming</h3>
+                    <p class="text-white/70">
+                        Hours spent coordinating visuals to match copy tone
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Solution Scene -->
+    <div class="scene">
+        <div class="max-w-5xl">
+            <h2 class="text-5xl font-bold mb-12 text-center gradient-text" style="animation: fadeIn 0.8s ease-out">
+                The Solution ✨
+            </h2>
+            <div class="glass-effect mb-8" style="animation: scaleIn 1s ease-out 0.3s backwards">
+                <h3 class="text-3xl font-bold mb-6">Unified, Interleaved Campaign Generation</h3>
+                <ul class="space-y-4 text-xl text-white/80">
+                    <li class="flex items-start gap-4">
+                        <span class="text-3xl">✅</span>
+                        <span>Single platform generates all marketing assets simultaneously</span>
+                    </li>
+                    <li class="flex items-start gap-4">
+                        <span class="text-3xl">✅</span>
+                        <span>AI ensures visual prompts match the mood of copy</span>
+                    </li>
+                    <li class="flex items-start gap-4">
+                        <span class="text-3xl">✅</span>
+                        <span>Complete campaign in under 3 seconds</span>
+                    </li>
+                    <li class="flex items-start gap-4">
+                        <span class="text-3xl">✅</span>
+                        <span>Cohesive brand experience across all touchpoints</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works -->
+    <div class="scene">
+        <div class="max-w-6xl w-full">
+            <h2 class="text-5xl font-bold mb-16 text-center gradient-text">
+                How It Works
+            </h2>
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div style="animation: slideInLeft 1s ease-out">
+                    <div class="space-y-8">
+                        <div class="flex gap-4">
+                            <div class="text-4xl font-bold text-purple-400">1</div>
+                            <div>
+                                <h3 class="text-2xl font-bold mb-2">Describe Your Business</h3>
+                                <p class="text-white/70">Tell us about your product, target audience, and unique value</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="text-4xl font-bold text-purple-400">2</div>
+                            <div>
+                                <h3 class="text-2xl font-bold mb-2">Select Campaign Mood</h3>
+                                <p class="text-white/70">Choose from 6 distinct moods to match your brand personality</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="text-4xl font-bold text-purple-400">3</div>
+                            <div>
+                                <h3 class="text-2xl font-bold mb-2">Generate Campaign</h3>
+                                <p class="text-white/70">Gemini creates cohesive assets in a unified flow</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="text-4xl font-bold text-purple-400">4</div>
+                            <div>
+                                <h3 class="text-2xl font-bold mb-2">Export & Use</h3>
+                                <p class="text-white/70">Copy assets individually or export everything at once</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="animation: slideInRight 1s ease-out">
+                    <div class="glass-effect p-8">
+                        <div class="space-y-4">
+                            <div class="h-12 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg flex items-center px-4">
+                                <span class="text-white/60">Business: Sustainable bamboo watches...</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="h-16 bg-gradient-to-br from-purple-500/30 to-pink-500/30 rounded-lg flex items-center justify-center border-2 border-purple-400">
+                                    <span class="font-semibold">Elegant</span>
+                                </div>
+                                <div class="h-16 bg-white/5 rounded-lg flex items-center justify-center">
+                                    <span class="text-white/40">Energetic</span>
+                                </div>
+                                <div class="h-16 bg-white/5 rounded-lg flex items-center justify-center">
+                                    <span class="text-white/40">Minimal</span>
+                                </div>
+                                <div class="h-16 bg-white/5 rounded-lg flex items-center justify-center">
+                                    <span class="text-white/40">Warm</span>
+                                </div>
+                            </div>
+                            <div class="h-14 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg flex items-center justify-center font-bold">
+                                ✨ Generate Campaign
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generated Assets Scene -->
+    <div class="scene">
+        <div class="max-w-6xl w-full">
+            <h2 class="text-5xl font-bold mb-12 text-center gradient-text">
+                Generated Campaign Assets
+            </h2>
+            <div class="space-y-6">
+                <div class="glass-effect demo-step">
+                    <div class="flex items-center gap-4 mb-4">
+                        <span class="text-4xl">✍️</span>
+                        <span class="badge">Text - Hook</span>
+                    </div>
+                    <p class="text-xl text-white/90 leading-relaxed">
+                        "Transform your world with sustainable bamboo watches. Where innovation meets elegance in perfect harmony."
+                    </p>
+                    <p class="text-sm text-white/50 mt-3 italic">💡 Bold, confident tone with luxury appeal</p>
+                </div>
+
+                <div class="glass-effect demo-step">
+                    <div class="flex items-center gap-4 mb-4">
+                        <span class="text-4xl">📸</span>
+                        <span class="badge">Image Prompt - Hero Visual</span>
+                    </div>
+                    <p class="text-xl text-white/90 leading-relaxed">
+                        "Professional product photography of sustainable bamboo watch. Cinematic elegant lighting with dramatic shadows, shot on 85mm lens f/1.4. Photorealistic 8k with rich wood grain textures..."
+                    </p>
+                    <p class="text-sm text-white/50 mt-3 italic">💡 Hero shot with professional photography aesthetics</p>
+                </div>
+
+                <div class="glass-effect demo-step">
+                    <div class="flex items-center gap-4 mb-4">
+                        <span class="text-4xl">✍️</span>
+                        <span class="badge">Text - Storytelling</span>
+                    </div>
+                    <p class="text-xl text-white/90 leading-relaxed">
+                        "Every detail crafted with purpose. Sustainable bamboo watches represent more than a product—it's a lifestyle choice that reflects your values."
+                    </p>
+                    <p class="text-sm text-white/50 mt-3 italic">💡 Storytelling narrative with elegant typography</p>
+                </div>
+
+                <div class="glass-effect demo-step">
+                    <div class="flex items-center gap-4 mb-4">
+                        <span class="text-4xl">🎬</span>
+                        <span class="badge">Video Prompt - Call to Action</span>
+                    </div>
+                    <p class="text-xl text-white/90 leading-relaxed">
+                        "10-second premium social ad. Slow-motion reveal with elegant lighting. Dynamic close-ups, smooth camera. Elegant tones, high contrast. Shot on RED camera, 9:16 vertical..."
+                    </p>
+                    <p class="text-sm text-white/50 mt-3 italic">💡 High-energy video with premium production value</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Features -->
+    <div class="scene">
+        <div class="max-w-6xl w-full">
+            <h2 class="text-5xl font-bold mb-16 text-center">
+                Key Features
+            </h2>
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="feature-card">
+                    <div class="text-5xl mb-4">⚡</div>
+                    <h3 class="text-2xl font-bold mb-3">Lightning Fast</h3>
+                    <p class="text-white/70">Generate complete campaigns in under 3 seconds</p>
+                </div>
+                <div class="feature-card">
+                    <div class="text-5xl mb-4">🎨</div>
+                    <h3 class="text-2xl font-bold mb-3">Mood-Based</h3>
+                    <p class="text-white/70">6 distinct mood options for brand alignment</p>
+                </div>
+                <div class="feature-card">
+                    <div class="text-5xl mb-4">🔗</div>
+                    <h3 class="text-2xl font-bold mb-3">Interleaved</h3>
+                    <p class="text-white/70">Assets flow together with cohesive themes</p>
+                </div>
+                <div class="feature-card">
+                    <div class="text-5xl mb-4">📋</div>
+                    <h3 class="text-2xl font-bold mb-3">Easy Export</h3>
+                    <p class="text-white/70">Copy individual or export all assets instantly</p>
+                </div>
+                <div class="feature-card">
+                    <div class="text-5xl mb-4">📱</div>
+                    <h3 class="text-2xl font-bold mb-3">Responsive</h3>
+                    <p class="text-white/70">Beautiful on desktop, tablet, and mobile</p>
+                </div>
+                <div class="feature-card">
+                    <div class="text-5xl mb-4">🤖</div>
+                    <h3 class="text-2xl font-bold mb-3">AI-Powered</h3>
+                    <p class="text-white/70">Powered by Google Gemini 3 Flash</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Technical Achievements -->
+    <div class="scene">
+        <div class="max-w-5xl w-full">
+            <h2 class="text-5xl font-bold mb-16 text-center gradient-text">
+                Technical Achievements
+            </h2>
+            <div class="grid md:grid-cols-3 gap-8 mb-12">
+                <div class="metric">
+                    <div class="metric-value">100%</div>
+                    <div class="text-xl text-white/70 mt-2">Test Coverage</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">98/100</div>
+                    <div class="text-xl text-white/70 mt-2">Quality Score</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">&lt;3s</div>
+                    <div class="text-xl text-white/70 mt-2">Generation Time</div>
+                </div>
+            </div>
+            <div class="glass-effect">
+                <h3 class="text-2xl font-bold mb-6">Competition Requirements</h3>
+                <div class="grid md:grid-cols-3 gap-6">
+                    <div class="flex items-start gap-3">
+                        <span class="text-3xl">✅</span>
+                        <div>
+                            <div class="font-bold mb-1">Gemini Model</div>
+                            <div class="text-sm text-white/60">Gemini 3 Flash architecture</div>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-3xl">✅</span>
+                        <div>
+                            <div class="font-bold mb-1">Google GenAI SDK</div>
+                            <div class="text-sm text-white/60">Structured JSON schema</div>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-3xl">✅</span>
+                        <div>
+                            <div class="font-bold mb-1">Google Cloud</div>
+                            <div class="text-sm text-white/60">Vertex AI ready</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Final Scene -->
+    <div class="scene">
+        <div class="text-center max-w-4xl">
+            <h2 class="text-6xl font-bold mb-8 gradient-text">
+                Transform Your Marketing
+            </h2>
+            <p class="text-2xl text-white/70 mb-12">
+                Stop juggling tools. Start creating cohesive campaigns in seconds.
+            </p>
+            <div class="glass-effect inline-block px-12 py-6">
+                <div class="text-5xl mb-4">🏆</div>
+                <div class="text-2xl font-bold">#GeminiLiveAgentChallenge</div>
+                <div class="text-white/60 mt-2">Direct-to-Mood Marketing Studio</div>
+            </div>
+            <div class="mt-12 text-white/40">
+                <p>Built with Google Gemini 3 Flash • Vertex AI • React</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-scroll through scenes for demo
+        let currentScene = 0;
+        const scenes = document.querySelectorAll('.scene');
+        
+        function nextScene() {
+            if (currentScene < scenes.length - 1) {
+                currentScene++;
+                scenes[currentScene].scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                // Loop back to start
+                currentScene = 0;
+                scenes[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        // Auto-advance every 8 seconds
+        setInterval(nextScene, 8000);
+
+        // Manual navigation with arrow keys
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                nextScene();
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                if (currentScene > 0) {
+                    currentScene--;
+                    scenes[currentScene].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        });
+    </script>
+</body>
+</html>

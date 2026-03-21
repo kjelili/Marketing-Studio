@@ -144,7 +144,7 @@ function App() {
     setDirectorNotes([]);
     setBrief(null);
     setQa(null);
-    setActiveStep('starting');
+    setActiveStep('');
     setVideoUrl('');
     setVideoStatus('');
     setIsVideoGenerating(false);
@@ -212,6 +212,8 @@ function App() {
               }
               else if (kind === 'replace_all') {
                 setAssets([]);
+                setQa(null);
+                setVideoAttempted(false);
               }
               else if (kind === 'asset') {
                 const normalized = {
@@ -325,9 +327,11 @@ function App() {
 
   // Auto-generate video once all core assets + QA are ready (single attempt, no retry loop)
   useEffect(() => {
+    const hasTextContent = assets.some(a => a.type === 'text' && a.content && a.content.trim());
     const shouldAutoGenerateVideo =
       view === 'campaign' &&
       assets.length > 0 &&
+      hasTextContent &&
       qa &&
       !videoUrl &&
       !isVideoGenerating &&
@@ -345,6 +349,13 @@ function App() {
         const voScript = textAssets.length > 1
           ? textAssets[textAssets.length - 1].content
           : (textAssets[0]?.content || '');
+
+        if (!voScript.trim()) {
+          setVideoStatus('⚠ No text assets available for video script. Generate a campaign with text first.');
+          setIsVideoGenerating(false);
+          return;
+        }
+
         const response = await fetch('/api/generate-video', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

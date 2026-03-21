@@ -299,6 +299,7 @@ Generate a polished, visually stunning spot with ambient audio/music but absolut
 
   } catch (error) {
     console.error('Video generation error:', error.message);
+    if (res.headersSent) return;
     return res.status(500).json({
       error: 'Video generation failed',
       message: error.message || 'Unknown error',
@@ -825,6 +826,13 @@ app.post('/api/refine-campaign', async (req, res) => {
 // ── 404 ──
 app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
+});
+
+// ── Global error handler — always return JSON, never HTML ──
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err.message || err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'Internal server error', message: err.message || 'Unknown error' });
 });
 
 // ── Start ──

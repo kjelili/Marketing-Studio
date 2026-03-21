@@ -360,11 +360,19 @@ function App() {
           resolution: '1080p',
         }),
       });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.message || err.error || 'Video generation failed');
+
+      const rawText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error(rawText.substring(0, 150) || 'Server returned non-JSON response');
       }
-      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Video generation failed');
+      }
+
       setVideoUrl(data.videoUrl);
       setVideoStatus('✓ Video generated');
     } catch (e) {

@@ -154,9 +154,10 @@ app.get('/api/health', (req, res) => {
 });
 
 // ══════════════════════════════════════════════════
-// VIDEO GENERATION ENDPOINT (Veo 3.1 via Gemini API)
+// VIDEO GENERATION ENDPOINT (Veo via Gemini API)
 // Uses @google/genai models.generateVideos
 // Saves mp4 under /videos and returns a public URL
+// Includes retry logic for transient Veo failures
 // ══════════════════════════════════════════════════
 app.post('/api/generate-video', async (req, res) => {
   try {
@@ -198,54 +199,104 @@ ${videoPrompt.trim()}
 Generate a polished, visually stunning spot with ambient audio/music but absolutely no spoken voiceover.
 `.trim();
 
-    console.log('Starting video generation with Veo 3.1…');
+    // ── Veo model fallback chain ──
+    const veoModels = [
+      'veo-3.1-generate-preview',
+      'veo-2.0-generate-001',
+    ];
 
-    let operation = await ai.models.generateVideos({
-      model: 'veo-3.1-generate-preview',
-      prompt: fullPrompt,
-      config: {
-        durationSeconds,
-        aspectRatio,
-        resolution,
-      },
-    });
+    const MAX_RETRIES = 2;
+    let lastError = null;
 
-    // Poll until the operation is done
-    while (!operation.done) {
-      console.log('Waiting for video generation to complete…');
-      await new Promise((resolve) => setTimeout(resolve, 10000));
-      operation = await ai.operations.getVideosOperation({
-        operation,
-      });
+    for (const veoModel of veoModels) {
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          console.log(`Video generation: trying ${veoModel} (attempt ${attempt}/${MAX_RETRIES})…`);
+
+          let operation = await ai.models.generateVideos({
+            model: veoModel,
+            prompt: fullPrompt,
+            config: {
+              durationSeconds,
+              aspectRatio,
+              resolution,
+            },
+          });
+
+          // Poll until the operation is done
+          const maxPolls = 30; // ~5 minutes max
+          let polls = 0;
+          while (!operation.done && polls < maxPolls) {
+            console.log(`  Polling video status (${polls + 1}/${maxPolls})…`);
+            await new Promise((resolve) => setTimeout(resolve, 10000));
+            operation = await ai.operations.getVideosOperation({ operation });
+            polls++;
+          }
+
+          if (!operation.done) {
+            throw new Error(`Video generation timed out after ${maxPolls * 10}s`);
+          }
+
+          const generatedVideos = operation?.response?.generatedVideos || [];
+
+          // Find first video with actual data
+          const validVideo = generatedVideos.find(v => v && v.video);
+          if (!validVideo) {
+            const reason = operation?.response?.error?.message
+              || (generatedVideos.length === 0 ? 'Veo returned an empty result — the prompt may have been filtered or the model was overloaded' : 'Veo returned entries but none contained video data');
+            throw new Error(reason);
+          }
+
+          const videoRef = validVideo.video;
+
+          // Ensure videos directory exists
+          const videosDir = path.join(__dirname, 'videos');
+          if (!fs.existsSync(videosDir)) {
+            fs.mkdirSync(videosDir, { recursive: true });
+          }
+
+          const fileName = `video-${Date.now()}.mp4`;
+          const downloadPath = path.join(videosDir, fileName);
+
+          await ai.files.download({
+            file: videoRef,
+            downloadPath,
+          });
+
+          // Verify the file was actually written and has content
+          if (!fs.existsSync(downloadPath) || fs.statSync(downloadPath).size === 0) {
+            throw new Error('Video file download succeeded but file is empty');
+          }
+
+          console.log(`✓ Video saved: ${downloadPath} (${(fs.statSync(downloadPath).size / 1024).toFixed(0)} KB)`);
+
+          return res.json({
+            videoUrl: `/videos/${fileName}`,
+            model: veoModel,
+          });
+
+        } catch (err) {
+          lastError = err;
+          console.log(`  ✗ ${veoModel} attempt ${attempt} failed: ${err.message?.substring(0, 200)}`);
+
+          // If this isn't the last attempt with this model, wait before retry
+          if (attempt < MAX_RETRIES) {
+            const backoff = attempt * 5000;
+            console.log(`  Retrying in ${backoff / 1000}s…`);
+            await new Promise(r => setTimeout(r, backoff));
+          }
+        }
+      }
+      // All retries for this model exhausted, try next model
     }
 
-    const generatedVideos = operation?.response?.generatedVideos || [];
-    if (!generatedVideos.length || !generatedVideos[0].video) {
-      throw new Error('No video returned from Veo 3.1');
-    }
-
-    const videoRef = generatedVideos[0].video;
-
-    // Ensure videos directory exists
-    const videosDir = path.join(__dirname, 'videos');
-    if (!fs.existsSync(videosDir)) {
-      fs.mkdirSync(videosDir, { recursive: true });
-    }
-
-    const fileName = `video-${Date.now()}.mp4`;
-    const downloadPath = path.join(videosDir, fileName);
-
-    await ai.files.download({
-      file: videoRef,
-      downloadPath,
+    // All models and retries exhausted
+    console.error('Video generation failed after all attempts:', lastError?.message);
+    return res.status(500).json({
+      error: 'Video generation failed',
+      message: lastError?.message || 'All Veo models failed after retries',
     });
 
-    console.log('Video saved to', downloadPath);
-
-    // Express static is already serving __dirname, so /videos/... is public
-    return res.json({
-      videoUrl: `/videos/${fileName}`,
-    });
   } catch (error) {
     console.error('Video generation error:', error.message);
     return res.status(500).json({
@@ -353,7 +404,7 @@ app.post('/api/generate-campaign', async (req, res) => {
     sendEvent('run', { runId });
     sendEvent('status', { message: 'Creative Director is thinking...' });
     sendEvent('step', { step: 'brief', message: 'Extracting brand brief...' });
-    sendEvent('director_note', { message: 'I’m extracting brand voice, audience, and constraints so the output feels like one cohesive creative direction.' });
+    sendEvent('director_note', { message: 'I'm extracting brand voice, audience, and constraints so the output feels like one cohesive creative direction.' });
 
     const briefPrompt = `Extract a structured brand brief from the user input. Return ONLY valid JSON with keys:
 {
@@ -533,7 +584,7 @@ Make the text and images feel like one cohesive creative brief. Reference colors
 
     // ── Agentic QA pass + optional auto-revision ──
     sendEvent('step', { step: 'qa', message: 'Quality-checking cohesion and compliance...' });
-    sendEvent('director_note', { message: 'I’m reviewing cohesion (tone + visuals) and checking constraints before finalizing.' });
+    sendEvent('director_note', { message: 'I'm reviewing cohesion (tone + visuals) and checking constraints before finalizing.' });
 
     const qaPrompt = `You are a strict Creative Director QA reviewer.
 Return ONLY valid JSON:
@@ -631,6 +682,17 @@ Regenerate the full interleaved flow again (TEXT + IMAGE) in the same structure 
         }
       }
       finalAssetCount = idx;
+
+      // Re-run QA after revision so the client has fresh scores
+      const revisedQa = computeHeuristicQa(
+        revisedParts.map((p, i) => {
+          if (p.text) return { type: 'text', content: p.text };
+          if (p.inlineData) return { type: 'image', content: '(image)' };
+          return null;
+        }).filter(Boolean),
+        tabooMerged
+      );
+      sendEvent('qa', revisedQa);
     }
 
     sendEvent('complete', { 
@@ -784,11 +846,13 @@ app.listen(PORT, '0.0.0.0', () => {
 ║  • Server-Sent Events streaming                            ║
 ║  • Agent refinement loop (multi-turn chat)                 ║
 ║  • Creative Director system instruction                    ║
+║  • Veo video generation with retry logic                   ║
 ║                                                            ║
 ║  Endpoints:                                                ║
 ║  • GET  /api/health                                        ║
 ║  • POST /api/generate-campaign  (SSE stream)               ║
 ║  • POST /api/refine-campaign    (SSE stream)               ║
+║  • POST /api/generate-video     (JSON)                     ║
 ║                                                            ║
 ║  API Key: ${(process.env.GEMINI_API_KEY ? '✓ Configured' : '✗ Missing').padEnd(45)}║
 ║                                                            ║

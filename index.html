@@ -82,6 +82,7 @@ function App() {
   const [videoStatus, setVideoStatus] = useState('');
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
   const [videoAttempted, setVideoAttempted] = useState(false);
+  const [campaignComplete, setCampaignComplete] = useState(false);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -149,6 +150,7 @@ function App() {
     setVideoStatus('');
     setIsVideoGenerating(false);
     setVideoAttempted(false);
+    setCampaignComplete(false);
 
     try {
       const response = await fetch('/api/generate-campaign', {
@@ -214,6 +216,7 @@ function App() {
                 setAssets([]);
                 setQa(null);
                 setVideoAttempted(false);
+                setCampaignComplete(false);
               }
               else if (kind === 'asset') {
                 const normalized = {
@@ -225,7 +228,10 @@ function App() {
                 setAssets(prev => [...prev, normalized]);
                 setView('campaign');
               }
-              else if (kind === 'complete') setStatus(`✓ ${evt.assetCount} assets generated`);
+              else if (kind === 'complete') {
+                setStatus(`✓ ${evt.assetCount} assets generated`);
+                setCampaignComplete(true);
+              }
               else if (kind === 'error') setError(evt.message);
             } catch (e) { /* skip parse errors */ }
           }
@@ -323,16 +329,59 @@ function App() {
     setVideoStatus('');
     setIsVideoGenerating(false);
     setVideoAttempted(false);
+    setCampaignComplete(false);
   };
 
-  // Auto-generate video once all core assets + QA are ready (single attempt, no retry loop)
+  // Shared video generation logic — used by both auto-trigger and manual button
+  const generateVideo = useCallback(async () => {
+    const textAssets = assets.filter(a => a.type === 'text' && a.content && a.content.trim());
+    const voScript = textAssets.length > 1
+      ? textAssets[textAssets.length - 1].content
+      : (textAssets[0]?.content || '');
+
+    if (!voScript.trim()) {
+      setVideoStatus('⚠ No text content found for the video script. Try generating a new campaign.');
+      return;
+    }
+
+    try {
+      setIsVideoGenerating(true);
+      setVideoStatus('🎬 Generating video clip with Veo 3.1… this can take ~30–60s.');
+
+      const response = await fetch('/api/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoPrompt: voScript,
+          mood,
+          channel,
+          durationSeconds: 8,
+          aspectRatio: '16:9',
+          resolution: '1080p',
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || err.error || 'Video generation failed');
+      }
+      const data = await response.json();
+      setVideoUrl(data.videoUrl);
+      setVideoStatus('✓ Video generated');
+    } catch (e) {
+      setVideoStatus(`⚠ Video generation failed: ${e.message || e}. Click "Regenerate Video Clip" to retry.`);
+    } finally {
+      setIsVideoGenerating(false);
+    }
+  }, [assets, mood, channel]);
+
+  // Auto-generate video once campaign generation is fully complete
   useEffect(() => {
     const hasTextContent = assets.some(a => a.type === 'text' && a.content && a.content.trim());
     const shouldAutoGenerateVideo =
       view === 'campaign' &&
+      campaignComplete &&
       assets.length > 0 &&
       hasTextContent &&
-      qa &&
       !videoUrl &&
       !isVideoGenerating &&
       !videoAttempted;
@@ -340,50 +389,8 @@ function App() {
     if (!shouldAutoGenerateVideo) return;
 
     setVideoAttempted(true);
-
-    const run = async () => {
-      try {
-        setIsVideoGenerating(true);
-        setVideoStatus('🎬 Generating video clip with Veo 3.1… this can take ~30–60s.');
-        const textAssets = assets.filter(a => a.type === 'text');
-        const voScript = textAssets.length > 1
-          ? textAssets[textAssets.length - 1].content
-          : (textAssets[0]?.content || '');
-
-        if (!voScript.trim()) {
-          setVideoStatus('⚠ No text assets available for video script. Generate a campaign with text first.');
-          setIsVideoGenerating(false);
-          return;
-        }
-
-        const response = await fetch('/api/generate-video', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            videoPrompt: voScript,
-            mood,
-            channel,
-            durationSeconds: 8,
-            aspectRatio: '16:9',
-            resolution: '1080p',
-          }),
-        });
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          throw new Error(err.message || err.error || 'Video generation failed');
-        }
-        const data = await response.json();
-        setVideoUrl(data.videoUrl);
-        setVideoStatus('✓ Video generated');
-      } catch (e) {
-        setVideoStatus(`⚠ Video generation failed: ${e.message || e}. Click "Regenerate Video Clip" to retry.`);
-      } finally {
-        setIsVideoGenerating(false);
-      }
-    };
-
-    run();
-  }, [view, assets, qa, videoUrl, isVideoGenerating, videoAttempted, mood, channel]);
+    generateVideo();
+  }, [view, assets, campaignComplete, videoUrl, isVideoGenerating, videoAttempted, generateVideo]);
 
   return (
     <div className="min-h-screen">
@@ -833,8 +840,8 @@ function App() {
                   disabled={isVideoGenerating}
                   onClick={() => {
                     setVideoUrl('');
-                    setVideoAttempted(false);
-                    setVideoStatus('Regenerating video clip with Veo 3.1…');
+                    setVideoStatus('');
+                    generateVideo();
                   }}
                 >
                   {isVideoGenerating ? '🎬 Video Generating…' : (videoUrl ? '↻ Regenerate Video Clip' : '🎬 Generate Video Clip')}

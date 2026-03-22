@@ -175,10 +175,8 @@ function App() {
           const errJson = JSON.parse(errText);
           errMsg = errJson.error || errJson.message || errMsg;
         } catch {
-          // Vercel/platform returned non-JSON (e.g. "A server error occurred")
-          errMsg = response.status === 504 || response.status === 502
-            ? 'Server timed out — the campaign took too long to generate. Try a shorter business description or try again.'
-            : `Server error (${response.status}). The hosting platform may have timed out. Try again or use the Cloud Run deployment.`;
+          // Platform returned non-JSON (Vercel returns plain text on timeout/crash)
+          errMsg = 'The server could not complete the request. This usually means the hosting platform timed out. Try the Cloud Run deployment instead: https://gcloud-830001350094.europe-west1.run.app';
         }
         throw new Error(errMsg);
       }

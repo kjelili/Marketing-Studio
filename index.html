@@ -174,8 +174,7 @@ function App() {
           const errText = await response.text();
           const errJson = JSON.parse(errText);
           errMsg = errJson.error || errJson.message || errMsg;
-        } catch {
-          // Platform returned non-JSON (Vercel returns plain text on timeout/crash)
+        } catch (parseErr) {
           errMsg = 'The server could not complete the request. This usually means the hosting platform timed out. Try the Cloud Run deployment instead: https://gcloud-830001350094.europe-west1.run.app';
         }
         throw new Error(errMsg);
@@ -383,7 +382,7 @@ function App() {
 
       const startRaw = await startRes.text();
       let startData;
-      try { startData = JSON.parse(startRaw); } catch {
+      try { startData = JSON.parse(startRaw); } catch (e) {
         throw new Error('Server error — could not start video job');
       }
       if (!startRes.ok) {
@@ -402,7 +401,7 @@ function App() {
         const pollRes = await fetch(`/api/video-status/${jobId}`);
         const pollRaw = await pollRes.text();
         let poll;
-        try { poll = JSON.parse(pollRaw); } catch {
+        try { poll = JSON.parse(pollRaw); } catch (e) {
           // Transient error (e.g. cold start), keep polling
           continue;
         }

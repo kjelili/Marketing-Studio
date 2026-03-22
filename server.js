@@ -16,6 +16,12 @@ app.use(express.static(__dirname));
 
 // Explicit root route — express.static does not work reliably on Vercel serverless
 app.get('/', (req, res) => {
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    'Surrogate-Control': 'no-store',
+  });
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 

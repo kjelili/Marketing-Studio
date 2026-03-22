@@ -415,7 +415,7 @@ app.post('/api/generate-campaign', async (req, res) => {
     sendEvent('run', { runId });
     sendEvent('status', { message: 'Creative Director is thinking...' });
     sendEvent('step', { step: 'brief', message: 'Extracting brand brief...' });
-    sendEvent('director_note', { message: 'I'm extracting brand voice, audience, and constraints so the output feels like one cohesive creative direction.' });
+    sendEvent('director_note', { message: 'I am extracting brand voice, audience, and constraints so the output feels like one cohesive creative direction.' });
 
     const briefPrompt = `Extract a structured brand brief from the user input. Return ONLY valid JSON with keys:
 {
@@ -595,7 +595,7 @@ Make the text and images feel like one cohesive creative brief. Reference colors
 
     // ── Agentic QA pass + optional auto-revision ──
     sendEvent('step', { step: 'qa', message: 'Quality-checking cohesion and compliance...' });
-    sendEvent('director_note', { message: 'I'm reviewing cohesion (tone + visuals) and checking constraints before finalizing.' });
+    sendEvent('director_note', { message: 'I am reviewing cohesion (tone + visuals) and checking constraints before finalizing.' });
 
     const qaPrompt = `You are a strict Creative Director QA reviewer.
 Return ONLY valid JSON:
@@ -845,10 +845,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error', message: err.message || 'Unknown error' });
 });
 
-// ── Start ──
-app.listen(PORT, '0.0.0.0', () => {
-  const platform = process.env.K_SERVICE ? `Google Cloud Run (${process.env.K_SERVICE})` : 'local';
-  console.log(`
+// ── Start (only when NOT on Vercel — Vercel imports the module directly) ──
+if (!process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    const platform = process.env.K_SERVICE ? `Google Cloud Run (${process.env.K_SERVICE})` : 'local';
+    console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║                                                            ║
 ║  🎨 Direct-to-Mood Marketing Studio v2                    ║
@@ -875,8 +876,9 @@ app.listen(PORT, '0.0.0.0', () => {
 ║  API Key: ${(process.env.GEMINI_API_KEY ? '✓ Configured' : '✗ Missing').padEnd(45)}║
 ║                                                            ║
 ╚════════════════════════════════════════════════════════════╝
-  `);
-});
+    `);
+  });
+}
 
 process.on('SIGTERM', () => { console.log('SIGTERM → shutdown'); process.exit(0); });
 process.on('SIGINT', () => { console.log('SIGINT → shutdown'); process.exit(0); });

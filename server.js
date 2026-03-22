@@ -8,6 +8,9 @@ const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // ── Middleware ──
 app.use(express.json({ limit: '10mb' }));

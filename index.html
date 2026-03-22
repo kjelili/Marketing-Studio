@@ -169,8 +169,18 @@ function App() {
       });
 
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Generation failed');
+        let errMsg = 'Generation failed';
+        try {
+          const errText = await response.text();
+          const errJson = JSON.parse(errText);
+          errMsg = errJson.error || errJson.message || errMsg;
+        } catch {
+          // Vercel/platform returned non-JSON (e.g. "A server error occurred")
+          errMsg = response.status === 504 || response.status === 502
+            ? 'Server timed out — the campaign took too long to generate. Try a shorter business description or try again.'
+            : `Server error (${response.status}). The hosting platform may have timed out. Try again or use the Cloud Run deployment.`;
+        }
+        throw new Error(errMsg);
       }
 
       const reader = response.body.getReader();
@@ -245,8 +255,19 @@ function App() {
       ]);
 
     } catch (err) {
-      setError(err.message);
-      setView('landing');
+      const msg = err.message || String(err);
+      const isTimeout = /abort|network|failed to fetch|server error|timed? ?out/i.test(msg);
+      if (isTimeout && assets.length > 0) {
+        // Stream was killed but we already have some assets — show what we have
+        setStatus('⚠ Connection interrupted, but partial campaign is shown above.');
+        setView('campaign');
+        setCampaignComplete(true);
+      } else {
+        setError(isTimeout
+          ? 'Server timed out — try a shorter description, or use the Cloud Run deployment for longer campaigns.'
+          : msg);
+        setView('landing');
+      }
     }
   }, [businessInfo, mood]);
 

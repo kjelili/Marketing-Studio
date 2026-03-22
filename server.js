@@ -18,7 +18,7 @@ app.use(cors({ origin: true }));
 app.use(express.static(__dirname));
 
 function safeJsonParse(text) {
-  try { return JSON.parse(text); } catch { return null; }
+  try { return JSON.parse(text); } catch (e) { return null; }
 }
 
 function parseDataUrl(dataUrl) {
@@ -157,18 +157,19 @@ app.get('/api/health', (req, res) => {
 });
 
 // ══════════════════════════════════════════════════
-// VIDEO GENERATION — async start + poll pattern
-// Works within Vercel's serverless timeout limits
-// POST /api/generate-video  → starts job, returns { jobId }
-// GET  /api/video-status/:jobId → returns { status, videoUrl?, error? }
+// VIDEO GENERATION — SSE streaming pattern
+// Single long-lived connection: no in-memory Map, works on Vercel serverless
+// POST /api/generate-video  → SSE stream with progress updates + final video URL
 // ══════════════════════════════════════════════════
 
-const videoJobs = new Map(); // jobId → { status, videoUrl, error, startedAt }
-
 app.post('/api/generate-video', async (req, res) => {
+  const sendEvent = createSse(res);
+
   try {
     if (!ai) {
-      return res.status(500).json({ error: 'GenAI SDK not initialized — check GEMINI_API_KEY' });
+      sendEvent('video_error', { message: 'GenAI SDK not initialized — check GEMINI_API_KEY' });
+      res.write('data: [DONE]\n\n');
+      return res.end();
     }
 
     const {
@@ -181,52 +182,12 @@ app.post('/api/generate-video', async (req, res) => {
     } = req.body || {};
 
     if (!videoPrompt || typeof videoPrompt !== 'string' || !videoPrompt.trim()) {
-      return res.status(400).json({ error: 'Missing videoPrompt' });
+      sendEvent('video_error', { message: 'Missing videoPrompt' });
+      res.write('data: [DONE]\n\n');
+      return res.end();
     }
 
-    const jobId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
-
-    videoJobs.set(jobId, { status: 'processing', videoUrl: null, error: null, startedAt: Date.now() });
-
-    // Return immediately — frontend will poll
-    res.json({ jobId });
-
-    // Run generation in background
-    runVideoGeneration(jobId, {
-      videoPrompt: videoPrompt.trim(), mood, channel, durationSeconds, aspectRatio, resolution,
-    }).catch(err => {
-      console.error(`Video job ${jobId} unhandled error:`, err.message);
-      const job = videoJobs.get(jobId);
-      if (job && job.status === 'processing') {
-        job.status = 'failed';
-        job.error = err.message || 'Unknown error';
-      }
-    });
-
-  } catch (error) {
-    console.error('Video generation error:', error.message);
-    if (res.headersSent) return;
-    return res.status(500).json({ error: 'Video generation failed', message: error.message || 'Unknown error' });
-  }
-});
-
-app.get('/api/video-status/:jobId', (req, res) => {
-  const job = videoJobs.get(req.params.jobId);
-  if (!job) {
-    return res.status(404).json({ error: 'Job not found' });
-  }
-  res.json({
-    status: job.status,
-    videoUrl: job.videoUrl || null,
-    error: job.error || null,
-  });
-});
-
-async function runVideoGeneration(jobId, { videoPrompt, mood, channel, durationSeconds, aspectRatio, resolution }) {
-  const job = videoJobs.get(jobId);
-  if (!job) return;
-
-  const fullPrompt = `
+    const fullPrompt = `
 Create a short, cinematic marketing video. Do NOT include any spoken dialogue, narration, or voiceover — the audio track will be added separately by the application.
 
 Mood: ${mood || 'unspecified'}
@@ -241,86 +202,118 @@ VISUAL DIRECTION (no speech/voiceover — visuals only with ambient sound or mus
 
 MARKETING SCRIPT (for visual reference only — NOT to be spoken):
 """
-${videoPrompt}
+${videoPrompt.trim()}
 """
 
 Generate a polished, visually stunning spot with ambient audio/music but absolutely no spoken voiceover.
 `.trim();
 
-  const veoModels = ['veo-3.1-generate-preview', 'veo-2.0-generate-001'];
-  const MAX_RETRIES = 2;
-  let lastError = null;
+    const veoModels = ['veo-3.1-generate-preview', 'veo-2.0-generate-001'];
+    const MAX_RETRIES = 2;
+    let lastError = null;
+    let success = false;
 
-  for (const veoModel of veoModels) {
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        console.log(`Video job ${jobId}: trying ${veoModel} (attempt ${attempt}/${MAX_RETRIES})…`);
+    for (const veoModel of veoModels) {
+      if (success) break;
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          sendEvent('video_progress', { message: `Trying ${veoModel} (attempt ${attempt})…`, elapsed: 0 });
+          console.log(`Video SSE: trying ${veoModel} (attempt ${attempt}/${MAX_RETRIES})…`);
 
-        let operation = await ai.models.generateVideos({
-          model: veoModel,
-          prompt: fullPrompt,
-          config: { durationSeconds, aspectRatio, resolution },
-        });
+          let operation = await ai.models.generateVideos({
+            model: veoModel,
+            prompt: fullPrompt,
+            config: { durationSeconds, aspectRatio, resolution },
+          });
 
-        const maxPolls = 30;
-        let polls = 0;
-        while (!operation.done && polls < maxPolls) {
-          console.log(`  Job ${jobId}: polling (${polls + 1}/${maxPolls})…`);
-          await new Promise(r => setTimeout(r, 10000));
-          operation = await ai.operations.getVideosOperation({ operation });
-          polls++;
-        }
+          const maxPolls = 30;
+          let polls = 0;
+          const startTime = Date.now();
+          while (!operation.done && polls < maxPolls) {
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            sendEvent('video_progress', { message: `Generating video with ${veoModel}…`, elapsed, poll: polls + 1, maxPolls });
+            console.log(`  Video SSE: polling (${polls + 1}/${maxPolls}), ${elapsed}s elapsed…`);
+            await new Promise(r => setTimeout(r, 10000));
+            operation = await ai.operations.getVideosOperation({ operation });
+            polls++;
+          }
 
-        if (!operation.done) {
-          throw new Error(`Video generation timed out after ${maxPolls * 10}s`);
-        }
+          if (!operation.done) {
+            throw new Error(`Video generation timed out after ${maxPolls * 10}s`);
+          }
 
-        const generatedVideos = operation?.response?.generatedVideos || [];
-        const validVideo = generatedVideos.find(v => v && v.video);
-        if (!validVideo) {
-          const reason = operation?.response?.error?.message
-            || (generatedVideos.length === 0 ? 'Veo returned an empty result — prompt may have been filtered' : 'Veo returned entries but none contained video data');
-          throw new Error(reason);
-        }
+          const generatedVideos = operation?.response?.generatedVideos || [];
+          const validVideo = generatedVideos.find(v => v && v.video);
+          if (!validVideo) {
+            const reason = operation?.response?.error?.message
+              || (generatedVideos.length === 0 ? 'Veo returned an empty result — prompt may have been filtered' : 'Veo returned entries but none contained video data');
+            throw new Error(reason);
+          }
 
-        const videosDir = path.join(__dirname, 'videos');
-        if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir, { recursive: true });
+          sendEvent('video_progress', { message: 'Downloading video…', elapsed: Math.round((Date.now() - startTime) / 1000) });
 
-        const fileName = `video-${Date.now()}.mp4`;
-        const downloadPath = path.join(videosDir, fileName);
+          // Download to /tmp (writable on Vercel) with fallback to __dirname/videos
+          let videosDir = '/tmp/videos';
+          try {
+            if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir, { recursive: true });
+          } catch (e) {
+            videosDir = path.join(__dirname, 'videos');
+            if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir, { recursive: true });
+          }
 
-        await ai.files.download({ file: validVideo.video, downloadPath });
+          const fileName = `video-${Date.now()}.mp4`;
+          const downloadPath = path.join(videosDir, fileName);
 
-        if (!fs.existsSync(downloadPath) || fs.statSync(downloadPath).size === 0) {
-          throw new Error('Video file download succeeded but file is empty');
-        }
+          await ai.files.download({ file: validVideo.video, downloadPath });
 
-        console.log(`✓ Video job ${jobId} saved: ${downloadPath} (${(fs.statSync(downloadPath).size / 1024).toFixed(0)} KB)`);
+          if (!fs.existsSync(downloadPath) || fs.statSync(downloadPath).size === 0) {
+            throw new Error('Video file download succeeded but file is empty');
+          }
 
-        job.status = 'complete';
-        job.videoUrl = `/videos/${fileName}`;
+          const fileSizeKB = (fs.statSync(downloadPath).size / 1024).toFixed(0);
+          console.log(`✓ Video SSE saved: ${downloadPath} (${fileSizeKB} KB)`);
 
-        // Clean up old jobs (keep last 20)
-        if (videoJobs.size > 20) {
-          const oldest = [...videoJobs.entries()].sort((a, b) => a[1].startedAt - b[1].startedAt);
-          for (let i = 0; i < oldest.length - 20; i++) videoJobs.delete(oldest[i][0]);
-        }
-        return;
+          // Read video as base64 data URL so the frontend can use it directly
+          // (Vercel serverless has no persistent filesystem for serving static files)
+          const videoBuffer = fs.readFileSync(downloadPath);
+          const videoBase64 = videoBuffer.toString('base64');
+          const videoDataUrl = `data:video/mp4;base64,${videoBase64}`;
 
-      } catch (err) {
-        lastError = err;
-        console.log(`  ✗ Job ${jobId}: ${veoModel} attempt ${attempt} failed: ${err.message?.substring(0, 200)}`);
-        if (attempt < MAX_RETRIES) {
-          await new Promise(r => setTimeout(r, attempt * 5000));
+          // Clean up temp file
+          try { fs.unlinkSync(downloadPath); } catch (e) { /* ignore */ }
+
+          sendEvent('video_complete', { videoDataUrl, fileSizeKB });
+          success = true;
+          break;
+
+        } catch (err) {
+          lastError = err;
+          console.log(`  ✗ Video SSE: ${veoModel} attempt ${attempt} failed: ${err.message?.substring(0, 200)}`);
+          if (attempt < MAX_RETRIES) {
+            sendEvent('video_progress', { message: `Retrying ${veoModel}…`, retry: true });
+            await new Promise(r => setTimeout(r, attempt * 5000));
+          }
         }
       }
     }
-  }
 
-  job.status = 'failed';
-  job.error = lastError?.message || 'All Veo models failed after retries';
-  console.error(`Video job ${jobId} failed:`, job.error);
-}
+    if (!success) {
+      sendEvent('video_error', { message: lastError?.message || 'All Veo models failed after retries' });
+      console.error('Video SSE failed:', lastError?.message);
+    }
+
+  } catch (error) {
+    console.error('Video SSE unhandled error:', error.message);
+    if (!res.writableEnded) {
+      sendEvent('video_error', { message: error.message || 'Unknown error' });
+    }
+  } finally {
+    if (!res.writableEnded) {
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }
+  }
+});
 
 // ══════════════════════════════════════════════════
 // Regen a single image (for variations)
@@ -875,7 +868,7 @@ app.listen(PORT, '0.0.0.0', () => {
 ║  • GET  /api/health                                        ║
 ║  • POST /api/generate-campaign  (SSE stream)               ║
 ║  • POST /api/refine-campaign    (SSE stream)               ║
-║  • POST /api/generate-video     (JSON)                     ║
+║  • POST /api/generate-video     (SSE stream)               ║
 ║                                                            ║
 ║  API Key: ${(process.env.GEMINI_API_KEY ? '✓ Configured' : '✗ Missing').padEnd(45)}║
 ║                                                            ║

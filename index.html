@@ -366,8 +366,7 @@ function App() {
       setIsVideoGenerating(true);
       setVideoStatus('🎬 Starting video generation with Veo…');
 
-      // Step 1: Start the job — returns immediately with a jobId
-      const startRes = await fetch('/api/generate-video', {
+      const response = await fetch('/api/generate-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -380,46 +379,49 @@ function App() {
         }),
       });
 
-      const startRaw = await startRes.text();
-      let startData;
-      try { startData = JSON.parse(startRaw); } catch (e) {
-        throw new Error('Server error — could not start video job');
-      }
-      if (!startRes.ok) {
-        throw new Error(startData.message || startData.error || 'Failed to start video generation');
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error('Server error: ' + errText.substring(0, 200));
       }
 
-      const { jobId } = startData;
-      if (!jobId) throw new Error('No job ID returned');
+      // Read SSE stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      // Step 2: Poll for completion
-      const maxPolls = 60; // 60 × 5s = 5 minutes max
-      for (let i = 0; i < maxPolls; i++) {
-        setVideoStatus(`🎬 Generating video… (${i * 5}s elapsed, this can take 1–3 minutes)`);
-        await new Promise(r => setTimeout(r, 5000));
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-        const pollRes = await fetch(`/api/video-status/${jobId}`);
-        const pollRaw = await pollRes.text();
-        let poll;
-        try { poll = JSON.parse(pollRaw); } catch (e) {
-          // Transient error (e.g. cold start), keep polling
-          continue;
-        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-        if (poll.status === 'complete' && poll.videoUrl) {
-          setVideoUrl(poll.videoUrl);
-          setVideoStatus('✓ Video generated');
-          return;
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6).trim();
+          if (payload === '[DONE]') continue;
+
+          let msg;
+          try { msg = JSON.parse(payload); } catch (e) { continue; }
+
+          if (msg.event === 'video_progress') {
+            const elapsed = msg.elapsed || 0;
+            setVideoStatus('🎬 ' + (msg.message || 'Generating video…') + (elapsed ? ' (' + elapsed + 's elapsed)' : ''));
+          } else if (msg.event === 'video_complete' && msg.videoDataUrl) {
+            setVideoUrl(msg.videoDataUrl);
+            setVideoStatus('✓ Video generated (' + (msg.fileSizeKB || '?') + ' KB)');
+            return;
+          } else if (msg.event === 'video_error') {
+            throw new Error(msg.message || 'Video generation failed on server');
+          }
         }
-        if (poll.status === 'failed') {
-          throw new Error(poll.error || 'Video generation failed on server');
-        }
-        // status === 'processing' → keep polling
       }
 
-      throw new Error('Video generation timed out after 5 minutes');
+      // If we exit the loop without a video_complete event
+      throw new Error('Video stream ended without producing a video');
     } catch (e) {
-      setVideoStatus(`⚠ ${e.message || 'Video generation failed'}. Click "Regenerate Video Clip" to retry.`);
+      setVideoStatus('⚠ ' + (e.message || 'Video generation failed') + '. Click "Regenerate Video Clip" to retry.');
     } finally {
       setIsVideoGenerating(false);
     }

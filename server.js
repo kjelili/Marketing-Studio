@@ -14,6 +14,11 @@ app.use(express.json({ limit: '10mb' }));
 app.use(cors({ origin: true }));
 app.use(express.static(__dirname));
 
+// Explicit root route — express.static does not work reliably on Vercel serverless
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 function safeJsonParse(text) {
   try { return JSON.parse(text); } catch (e) { return null; }
 }

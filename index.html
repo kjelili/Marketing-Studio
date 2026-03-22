@@ -767,13 +767,14 @@ function App() {
                               const { done, value } = await reader.read();
                               if (done) break;
                               buffer += decoder.decode(value, { stream: true });
-                              const lines = buffer.split('\\n');
+                              const lines = buffer.split('\n');
                               buffer = lines.pop() || '';
                               for (const line of lines) {
                                 if (!line.startsWith('data: ')) continue;
                                 const data = line.slice(6).trim();
                                 if (data === '[DONE]') continue;
-                                const evt = JSON.parse(data);
+                                let evt;
+                                try { evt = JSON.parse(data); } catch (parseErr) { continue; }
                                 const kind = evt.event || evt.type;
                                 if (kind === 'asset' && (evt.assetType || evt.type) === 'image') {
                                   const next = { type: 'image', content: evt.content, mimeType: evt.mimeType, index: asset.index };

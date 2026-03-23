@@ -12,7 +12,6 @@ const PORT = process.env.PORT || 8080;
 // ── Middleware ──
 app.use(express.json({ limit: '10mb' }));
 app.use(cors({ origin: true }));
-app.use(express.static(__dirname));
 
 // Explicit root route — express.static does not work reliably on Vercel serverless
 app.get('/', (req, res) => {

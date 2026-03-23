@@ -350,120 +350,124 @@ function App() {
     setCampaignComplete(false);
   };
 
-  // Render a video with narration baked in using MediaRecorder + SpeechSynthesis
+  // Render a video with narration baked in using server-side Gemini TTS + MediaRecorder
   // Returns a Promise<Blob> of webm video with narration audio mixed in
-  const renderNarratedVideo = useCallback((videoSrc, narrationText, onProgress) => {
+  const renderNarratedVideo = useCallback(async (videoSrc, narrationText, onProgress) => {
+    if (!narrationText || !videoSrc) throw new Error('Missing video or narration text');
+
+    // Step 1: Get TTS audio from server
+    if (onProgress) onProgress('Generating AI voiceover with Gemini TTS…');
+    const ttsRes = await fetch('/api/generate-narration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: narrationText }),
+    });
+    if (!ttsRes.ok) {
+      const err = await ttsRes.text();
+      throw new Error('TTS failed: ' + err.substring(0, 200));
+    }
+    const ttsData = await ttsRes.json();
+    if (!ttsData.audioDataUrl) throw new Error('No audio returned from TTS');
+
+    if (onProgress) onProgress('Mixing narration with video… (silent render)');
+
+    // Step 2: Decode the TTS audio
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ttsResponse = await fetch(ttsData.audioDataUrl);
+    const ttsArrayBuffer = await ttsResponse.arrayBuffer();
+    const ttsAudioBuffer = await audioCtx.decodeAudioData(ttsArrayBuffer);
+    const ttsDuration = ttsAudioBuffer.duration;
+
+    // Step 3: Set up offscreen video
+    const vid = document.createElement('video');
+    vid.src = videoSrc;
+    vid.loop = true;
+    vid.playsInline = true;
+    vid.muted = true; // SILENT — no speaker output
+    vid.crossOrigin = 'anonymous';
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280;
+    canvas.height = 720;
+    const ctx = canvas.getContext('2d');
+
     return new Promise((resolve, reject) => {
-      if (!narrationText || !videoSrc) {
-        reject(new Error('Missing video or narration text'));
-        return;
-      }
+      vid.onloadeddata = async () => {
+        try {
+          await vid.play();
 
-      // Create offscreen video element
-      const vid = document.createElement('video');
-      vid.src = videoSrc;
-      vid.loop = true;
-      vid.playsInline = true;
-      vid.crossOrigin = 'anonymous';
-      vid.volume = 0.12; // low background so narration is clear
+          // Step 4: Create audio mixing destination (NOT connected to speakers)
+          const dest = audioCtx.createMediaStreamDestination();
 
-      // Create a canvas to draw video frames
-      const canvas = document.createElement('canvas');
-      canvas.width = 1280;
-      canvas.height = 720;
-      const ctx = canvas.getContext('2d');
+          // Play TTS audio through the mixing destination
+          const ttsSource = audioCtx.createBufferSource();
+          ttsSource.buffer = ttsAudioBuffer;
+          const ttsGain = audioCtx.createGain();
+          ttsGain.gain.value = 1.0;
+          ttsSource.connect(ttsGain);
+          ttsGain.connect(dest);
 
-      // Audio context for mixing
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const dest = audioCtx.createMediaStreamDestination();
+          // Combine canvas video stream + mixed audio (no speaker output)
+          const canvasStream = canvas.captureStream(30);
+          const combined = new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...dest.stream.getAudioTracks(),
+          ]);
 
-      // Connect video audio to mixer (lowered)
-      const vidSource = audioCtx.createMediaElementSource(vid);
-      const vidGain = audioCtx.createGain();
-      vidGain.gain.value = 0.12;
-      vidSource.connect(vidGain);
-      vidGain.connect(dest);
-      // Also connect to speakers so MediaRecorder captures it
-      vidGain.connect(audioCtx.destination);
+          const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+            ? 'video/webm;codecs=vp9,opus'
+            : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+              ? 'video/webm;codecs=vp8,opus'
+              : 'video/webm';
+          const recorder = new MediaRecorder(combined, { mimeType, videoBitsPerSecond: 2500000 });
+          const chunks = [];
 
-      // Combine canvas video stream + mixed audio
-      const canvasStream = canvas.captureStream(30);
-      const audioTracks = dest.stream.getAudioTracks();
-      const combined = new MediaStream([
-        ...canvasStream.getVideoTracks(),
-        ...audioTracks,
-      ]);
+          recorder.ondataavailable = (e) => {
+            if (e.data.size > 0) chunks.push(e.data);
+          };
 
-      // MediaRecorder
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-        ? 'video/webm;codecs=vp9,opus'
-        : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
-          ? 'video/webm;codecs=vp8,opus'
-          : 'video/webm';
-      const recorder = new MediaRecorder(combined, { mimeType, videoBitsPerSecond: 2500000 });
-      const chunks = [];
+          recorder.onstop = () => {
+            vid.pause();
+            vid.src = '';
+            audioCtx.close().catch(() => {});
+            const blob = new Blob(chunks, { type: mimeType });
+            resolve(blob);
+          };
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
+          recorder.onerror = (e) => {
+            vid.pause();
+            audioCtx.close().catch(() => {});
+            reject(new Error('Recording failed'));
+          };
 
-      recorder.onstop = () => {
-        audioCtx.close().catch(() => {});
-        vid.pause();
-        vid.src = '';
-        cancelAnimationFrame(drawFrame);
-        const blob = new Blob(chunks, { type: mimeType });
-        resolve(blob);
-      };
-
-      recorder.onerror = (e) => {
-        audioCtx.close().catch(() => {});
-        vid.pause();
-        reject(new Error('MediaRecorder error: ' + (e.error?.message || 'unknown')));
-      };
-
-      // Draw video frames to canvas
-      let drawFrame;
-      const draw = () => {
-        if (vid.paused || vid.ended) return;
-        ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
-        drawFrame = requestAnimationFrame(draw);
-      };
-
-      vid.onloadeddata = () => {
-        if (onProgress) onProgress('Starting narrated video render…');
-
-        vid.play().then(() => {
+          // Draw video frames to canvas
+          let animId;
+          const draw = () => {
+            if (vid.paused || vid.ended) return;
+            ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+            animId = requestAnimationFrame(draw);
+          };
           draw();
-          recorder.start(100); // collect data every 100ms
 
-          // Start narration
-          const utter = new SpeechSynthesisUtterance(narrationText);
-          utter.rate = 0.9;
-          utter.pitch = 1.0;
-          utter.volume = 1.0;
+          // Start recording
+          recorder.start(100);
+          ttsSource.start(0);
 
-          utter.onend = () => {
-            if (onProgress) onProgress('Narration complete, finalizing…');
-            // Let video play 2 more seconds for smooth ending
-            setTimeout(() => {
-              recorder.stop();
-            }, 2000);
-          };
+          if (onProgress) onProgress('Recording narrated video… (' + ttsDuration.toFixed(0) + 's)');
 
-          utter.onerror = () => {
-            // Still save what we have
-            setTimeout(() => recorder.stop(), 500);
-          };
+          // Stop after TTS duration + 2s grace
+          const totalMs = (ttsDuration + 2) * 1000;
+          setTimeout(() => {
+            cancelAnimationFrame(animId);
+            if (recorder.state === 'recording') recorder.stop();
+          }, totalMs);
 
-          window.speechSynthesis.cancel();
-          window.speechSynthesis.speak(utter);
-
-          if (onProgress) onProgress('Recording narration over video…');
-        }).catch(reject);
+        } catch (e) {
+          reject(e);
+        }
       };
 
-      vid.onerror = () => reject(new Error('Failed to load video for rendering'));
+      vid.onerror = () => reject(new Error('Failed to load video'));
       vid.load();
     });
   }, []);
@@ -574,7 +578,7 @@ function App() {
         </div>
         <div className="flex items-center gap-3">
           <span className="tag tag-native">Gemini Native Interleaved Output</span>
-          <span className="text-xs text-white/30">v2.3-narrated-export</span>
+          <span className="text-xs text-white/30">v2.4-gemini-tts</span>
         </div>
       </header>
 
@@ -1036,50 +1040,59 @@ function App() {
                       <button
                         className="text-[11px] font-semibold text-white bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 px-4 py-1.5 rounded-full transition-all"
                         onClick={async () => {
-                          // Cancel any existing speech
-                          window.speechSynthesis.cancel();
-
-                          // Gather ALL text assets for full narration
                           const allText = assets
                             .filter(a => a.type === 'text' && a.content && a.content.trim())
                             .map(a => a.content.trim())
                             .join('.\n\n');
-
                           if (!allText) return;
 
                           const vid = videoRef.current;
+                          setVideoStatus('🎙 Generating AI voiceover…');
 
-                          // Start video playback (looping so it covers the full narration)
-                          if (vid) {
-                            vid.loop = true;
-                            vid.currentTime = 0;
-                            vid.muted = false;
-                            vid.volume = 0.15; // low background audio so narration is clear
-                            try { await vid.play(); } catch (e) { /* autoplay may be blocked */ }
-                          }
+                          try {
+                            // Get TTS audio from server
+                            const ttsRes = await fetch('/api/generate-narration', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ text: allText }),
+                            });
+                            if (!ttsRes.ok) throw new Error('TTS failed');
+                            const ttsData = await ttsRes.json();
 
-                          // Start narration after a brief pause
-                          const utter = new SpeechSynthesisUtterance(allText);
-                          utter.rate = 0.9;
-                          utter.pitch = 1.0;
-                          utter.volume = 1.0;
+                            // Create audio element for TTS
+                            const ttsAudio = new Audio(ttsData.audioDataUrl);
+                            ttsAudio.volume = 1.0;
 
-                          utter.onend = () => {
-                            // Stop video looping and let it finish current playback
+                            // Start video (looping, low volume for background)
                             if (vid) {
-                              vid.loop = false;
-                              // Fade out after a short grace period
-                              setTimeout(() => {
-                                if (vid && !vid.paused) vid.pause();
-                              }, 2000);
+                              vid.loop = true;
+                              vid.currentTime = 0;
+                              vid.muted = false;
+                              vid.volume = 0.1;
+                              try { await vid.play(); } catch (e) { /* autoplay blocked */ }
                             }
-                          };
 
-                          utter.onerror = () => {
-                            if (vid) vid.loop = false;
-                          };
+                            // Play TTS narration
+                            await ttsAudio.play();
+                            setVideoStatus('🔊 Playing narration…');
 
-                          window.speechSynthesis.speak(utter);
+                            ttsAudio.onended = () => {
+                              if (vid) {
+                                vid.loop = false;
+                                setTimeout(() => { if (vid && !vid.paused) vid.pause(); }, 2000);
+                              }
+                              setVideoStatus('✓ Narration complete');
+                            };
+                          } catch (e) {
+                            setVideoStatus('⚠ ' + (e.message || 'Narration failed'));
+                            // Fallback to browser speech synthesis
+                            window.speechSynthesis.cancel();
+                            const utter = new SpeechSynthesisUtterance(allText);
+                            utter.rate = 0.9;
+                            if (vid) { vid.loop = true; vid.currentTime = 0; vid.volume = 0.1; try { await vid.play(); } catch (e2) {} }
+                            window.speechSynthesis.speak(utter);
+                            utter.onend = () => { if (vid) { vid.loop = false; setTimeout(() => { if (vid && !vid.paused) vid.pause(); }, 2000); } };
+                          }
                         }}
                       >
                         ▶ Play Video with Full Narration

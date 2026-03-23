@@ -329,6 +329,95 @@ Generate a polished, visually stunning spot with ambient audio/music but absolut
 });
 
 // ══════════════════════════════════════════════════
+// TTS NARRATION — Generate voiceover audio via Gemini TTS
+// POST /api/generate-narration → returns { audioDataUrl, mimeType, durationEstimate }
+// ══════════════════════════════════════════════════
+app.post('/api/generate-narration', async (req, res) => {
+  try {
+    if (!ai) {
+      return res.status(500).json({ error: 'GenAI SDK not initialized' });
+    }
+
+    const { text, voiceName } = req.body || {};
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ error: 'Missing text for narration' });
+    }
+
+    console.log('TTS: generating narration for', text.length, 'chars...');
+
+    const ttsResult = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-preview-tts',
+      contents: `Read the following marketing campaign text in a warm, professional, confident advertising voice. Pace yourself naturally with brief pauses between sections:\n\n${text.trim()}`,
+      config: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: voiceName || 'Kore',
+            },
+          },
+        },
+      },
+    });
+
+    const parts = ttsResult?.candidates?.[0]?.content?.parts || [];
+    const audioPart = parts.find(p => p.inlineData && p.inlineData.data);
+
+    if (!audioPart || !audioPart.inlineData?.data) {
+      throw new Error('No audio returned from TTS model');
+    }
+
+    const rawMime = audioPart.inlineData.mimeType || 'audio/L16;codec=pcm;rate=24000';
+    const audioBase64 = audioPart.inlineData.data;
+
+    // Gemini TTS returns raw PCM (L16, 24kHz, 16-bit, mono)
+    // Convert to WAV by prepending a WAV header
+    const pcmBuffer = Buffer.from(audioBase64, 'base64');
+    const sampleRate = 24000;
+    const numChannels = 1;
+    const bitsPerSample = 16;
+    const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+    const blockAlign = numChannels * (bitsPerSample / 8);
+    const dataSize = pcmBuffer.length;
+    const headerSize = 44;
+
+    const wavBuffer = Buffer.alloc(headerSize + dataSize);
+    // RIFF header
+    wavBuffer.write('RIFF', 0);
+    wavBuffer.writeUInt32LE(36 + dataSize, 4);
+    wavBuffer.write('WAVE', 8);
+    // fmt chunk
+    wavBuffer.write('fmt ', 12);
+    wavBuffer.writeUInt32LE(16, 16); // chunk size
+    wavBuffer.writeUInt16LE(1, 20);  // PCM format
+    wavBuffer.writeUInt16LE(numChannels, 22);
+    wavBuffer.writeUInt32LE(sampleRate, 24);
+    wavBuffer.writeUInt32LE(byteRate, 28);
+    wavBuffer.writeUInt16LE(blockAlign, 32);
+    wavBuffer.writeUInt16LE(bitsPerSample, 34);
+    // data chunk
+    wavBuffer.write('data', 36);
+    wavBuffer.writeUInt32LE(dataSize, 40);
+    pcmBuffer.copy(wavBuffer, headerSize);
+
+    const wavBase64 = wavBuffer.toString('base64');
+    const durationEstimate = (dataSize / byteRate).toFixed(1);
+
+    console.log('TTS: generated', (wavBuffer.length / 1024).toFixed(0), 'KB WAV,', durationEstimate, 's');
+
+    res.json({
+      audioDataUrl: `data:audio/wav;base64,${wavBase64}`,
+      mimeType: 'audio/wav',
+      durationEstimate: parseFloat(durationEstimate),
+    });
+
+  } catch (error) {
+    console.error('TTS error:', error.message);
+    res.status(500).json({ error: error.message || 'TTS generation failed' });
+  }
+});
+
+// ══════════════════════════════════════════════════
 // Regen a single image (for variations)
 // ══════════════════════════════════════════════════
 app.post('/api/regen-image', async (req, res) => {

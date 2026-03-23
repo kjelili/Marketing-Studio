@@ -350,6 +350,124 @@ function App() {
     setCampaignComplete(false);
   };
 
+  // Render a video with narration baked in using MediaRecorder + SpeechSynthesis
+  // Returns a Promise<Blob> of webm video with narration audio mixed in
+  const renderNarratedVideo = useCallback((videoSrc, narrationText, onProgress) => {
+    return new Promise((resolve, reject) => {
+      if (!narrationText || !videoSrc) {
+        reject(new Error('Missing video or narration text'));
+        return;
+      }
+
+      // Create offscreen video element
+      const vid = document.createElement('video');
+      vid.src = videoSrc;
+      vid.loop = true;
+      vid.playsInline = true;
+      vid.crossOrigin = 'anonymous';
+      vid.volume = 0.12; // low background so narration is clear
+
+      // Create a canvas to draw video frames
+      const canvas = document.createElement('canvas');
+      canvas.width = 1280;
+      canvas.height = 720;
+      const ctx = canvas.getContext('2d');
+
+      // Audio context for mixing
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const dest = audioCtx.createMediaStreamDestination();
+
+      // Connect video audio to mixer (lowered)
+      const vidSource = audioCtx.createMediaElementSource(vid);
+      const vidGain = audioCtx.createGain();
+      vidGain.gain.value = 0.12;
+      vidSource.connect(vidGain);
+      vidGain.connect(dest);
+      // Also connect to speakers so MediaRecorder captures it
+      vidGain.connect(audioCtx.destination);
+
+      // Combine canvas video stream + mixed audio
+      const canvasStream = canvas.captureStream(30);
+      const audioTracks = dest.stream.getAudioTracks();
+      const combined = new MediaStream([
+        ...canvasStream.getVideoTracks(),
+        ...audioTracks,
+      ]);
+
+      // MediaRecorder
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+        ? 'video/webm;codecs=vp9,opus'
+        : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+          ? 'video/webm;codecs=vp8,opus'
+          : 'video/webm';
+      const recorder = new MediaRecorder(combined, { mimeType, videoBitsPerSecond: 2500000 });
+      const chunks = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        audioCtx.close().catch(() => {});
+        vid.pause();
+        vid.src = '';
+        cancelAnimationFrame(drawFrame);
+        const blob = new Blob(chunks, { type: mimeType });
+        resolve(blob);
+      };
+
+      recorder.onerror = (e) => {
+        audioCtx.close().catch(() => {});
+        vid.pause();
+        reject(new Error('MediaRecorder error: ' + (e.error?.message || 'unknown')));
+      };
+
+      // Draw video frames to canvas
+      let drawFrame;
+      const draw = () => {
+        if (vid.paused || vid.ended) return;
+        ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+        drawFrame = requestAnimationFrame(draw);
+      };
+
+      vid.onloadeddata = () => {
+        if (onProgress) onProgress('Starting narrated video render…');
+
+        vid.play().then(() => {
+          draw();
+          recorder.start(100); // collect data every 100ms
+
+          // Start narration
+          const utter = new SpeechSynthesisUtterance(narrationText);
+          utter.rate = 0.9;
+          utter.pitch = 1.0;
+          utter.volume = 1.0;
+
+          utter.onend = () => {
+            if (onProgress) onProgress('Narration complete, finalizing…');
+            // Let video play 2 more seconds for smooth ending
+            setTimeout(() => {
+              recorder.stop();
+            }, 2000);
+          };
+
+          utter.onerror = () => {
+            // Still save what we have
+            setTimeout(() => recorder.stop(), 500);
+          };
+
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(utter);
+
+          if (onProgress) onProgress('Recording narration over video…');
+        }).catch(reject);
+      };
+
+      vid.onerror = () => reject(new Error('Failed to load video for rendering'));
+      vid.load();
+    });
+  }, []);
+
   // Shared video generation logic — used by both auto-trigger and manual button
   const generateVideo = useCallback(async () => {
     const textAssets = assets.filter(a => a.type === 'text' && a.content && a.content.trim());
@@ -456,7 +574,7 @@ function App() {
         </div>
         <div className="flex items-center gap-3">
           <span className="tag tag-native">Gemini Native Interleaved Output</span>
-          <span className="text-xs text-white/30">v2.2-narration</span>
+          <span className="text-xs text-white/30">v2.3-narrated-export</span>
         </div>
       </header>
 
@@ -1066,13 +1184,34 @@ function App() {
 
                     if (videoUrl) {
                       try {
+                        // First, include the raw video (no narration)
                         const resp = await fetch(videoUrl);
                         if (resp.ok) {
                           const ab = await resp.arrayBuffer();
-                          folder.file('video/video.mp4', ab);
+                          folder.file('video/video-raw.mp4', ab);
+                        }
+
+                        // Now render narrated version with speech baked in
+                        const narrationText = assets
+                          .filter(a => a.type === 'text' && a.content && a.content.trim())
+                          .map(a => a.content.trim())
+                          .join('.\n\n');
+
+                        if (narrationText) {
+                          setStatus('🎙 Recording narrated video… (speak aloud, please wait)');
+                          const narratedBlob = await renderNarratedVideo(
+                            videoUrl,
+                            narrationText,
+                            (msg) => setStatus('🎙 ' + msg)
+                          );
+                          const narratedBuf = await narratedBlob.arrayBuffer();
+                          const ext = narratedBlob.type.includes('webm') ? 'webm' : 'mp4';
+                          folder.file(`video/video-narrated.${ext}`, narratedBuf);
+                          setStatus('✓ Narrated video rendered');
                         }
                       } catch (e) {
-                        // skip video if download fails
+                        console.error('Video bundle error:', e);
+                        setStatus('⚠ Could not render narrated video, raw video still included');
                       }
                     }
 
@@ -1083,7 +1222,7 @@ function App() {
                     a.download = `${safeName}.zip`;
                     a.click();
                     URL.revokeObjectURL(url);
-                    setStatus(`✓ Exported bundle with ${imgCount} images${videoUrl ? ' + video' : ''}`);
+                    setStatus(`✓ Exported bundle with ${imgCount} images${videoUrl ? ' + raw & narrated video' : ''}`);
                   }}
                 >
                   ⬇️ Download Bundle (.zip)

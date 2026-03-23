@@ -360,14 +360,13 @@ function App() {
       return;
     }
 
-    // Estimate narration duration: ~140 words per minute, minimum 8s, max 60s
+    // Veo supports max 8 second videos — we loop during narration for longer text
     const wordCount = voScript.split(/\s+/).length;
-    const estimatedSeconds = Math.ceil((wordCount / 140) * 60);
-    const durationSeconds = Math.max(8, Math.min(60, estimatedSeconds));
+    const durationSeconds = 8; // Veo max; video loops during narration if text is longer
 
     try {
       setIsVideoGenerating(true);
-      setVideoStatus('🎬 Starting video generation with Veo… (estimated ' + durationSeconds + 's video for ' + wordCount + ' words)');
+      setVideoStatus('🎬 Starting video generation with Veo… (' + wordCount + ' words, video will loop during narration)');
 
       const response = await fetch('/api/generate-video', {
         method: 'POST',
@@ -378,7 +377,6 @@ function App() {
           channel,
           durationSeconds,
           aspectRatio: '16:9',
-          resolution: '1080p',
         }),
       });
 

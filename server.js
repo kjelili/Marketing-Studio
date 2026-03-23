@@ -12,6 +12,9 @@ const PORT = process.env.PORT || 8080;
 // ── Middleware ──
 app.use(express.json({ limit: '10mb' }));
 app.use(cors({ origin: true }));
+// NOTE: express.static intentionally removed — on Vercel serverless it serves
+// stale build-cache files. The explicit root route below handles index.html.
+// On Cloud Run / local, sendFile works the same way.
 
 // Explicit root route — express.static does not work reliably on Vercel serverless
 app.get('/', (req, res) => {
@@ -230,7 +233,10 @@ Generate a polished, visually stunning spot with ambient audio/music but absolut
           let operation = await ai.models.generateVideos({
             model: veoModel,
             prompt: fullPrompt,
-            config: { durationSeconds, aspectRatio, resolution },
+            config: {
+              durationSeconds: [4, 6, 8].includes(durationSeconds) ? durationSeconds : 8,
+              aspectRatio,
+            },
           });
 
           const maxPolls = 30;

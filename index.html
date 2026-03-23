@@ -353,18 +353,21 @@ function App() {
   // Shared video generation logic — used by both auto-trigger and manual button
   const generateVideo = useCallback(async () => {
     const textAssets = assets.filter(a => a.type === 'text' && a.content && a.content.trim());
-    const voScript = textAssets.length > 1
-      ? textAssets[textAssets.length - 1].content
-      : (textAssets[0]?.content || '');
+    const voScript = textAssets.map(a => a.content.trim()).join('\n\n');
 
     if (!voScript.trim()) {
       setVideoStatus('⚠ No text content found for the video script. Try generating a new campaign.');
       return;
     }
 
+    // Estimate narration duration: ~140 words per minute, minimum 8s, max 60s
+    const wordCount = voScript.split(/\s+/).length;
+    const estimatedSeconds = Math.ceil((wordCount / 140) * 60);
+    const durationSeconds = Math.max(8, Math.min(60, estimatedSeconds));
+
     try {
       setIsVideoGenerating(true);
-      setVideoStatus('🎬 Starting video generation with Veo…');
+      setVideoStatus('🎬 Starting video generation with Veo… (estimated ' + durationSeconds + 's video for ' + wordCount + ' words)');
 
       const response = await fetch('/api/generate-video', {
         method: 'POST',
@@ -373,7 +376,7 @@ function App() {
           videoPrompt: voScript,
           mood,
           channel,
-          durationSeconds: 8,
+          durationSeconds,
           aspectRatio: '16:9',
           resolution: '1080p',
         }),
@@ -455,7 +458,7 @@ function App() {
         </div>
         <div className="flex items-center gap-3">
           <span className="tag tag-native">Gemini Native Interleaved Output</span>
-          <span className="text-xs text-white/30">v2.1-sse</span>
+          <span className="text-xs text-white/30">v2.2-narration</span>
         </div>
       </header>
 
@@ -908,31 +911,59 @@ function App() {
                     <video
                       ref={videoRef}
                       controls
-                      muted
+                      loop
+                      playsInline
                       className="w-full max-w-xl mx-auto rounded-xl shadow-lg"
                       src={videoUrl}
                     />
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <button
                         className="text-[11px] font-semibold text-white bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 px-4 py-1.5 rounded-full transition-all"
-                        onClick={() => {
+                        onClick={async () => {
+                          // Cancel any existing speech
                           window.speechSynthesis.cancel();
-                          const textAssets = assets.filter(a => a.type === 'text');
-                          const voScript = textAssets.length > 1
-                            ? textAssets[textAssets.length - 1].content
-                            : (textAssets[0]?.content || '');
-                          const utter = new SpeechSynthesisUtterance(voScript);
-                          utter.rate = 0.95;
-                          utter.pitch = 1.0;
+
+                          // Gather ALL text assets for full narration
+                          const allText = assets
+                            .filter(a => a.type === 'text' && a.content && a.content.trim())
+                            .map(a => a.content.trim())
+                            .join('.\n\n');
+
+                          if (!allText) return;
+
                           const vid = videoRef.current;
+
+                          // Start video playback (looping so it covers the full narration)
                           if (vid) {
+                            vid.loop = true;
                             vid.currentTime = 0;
-                            vid.play();
+                            vid.muted = false;
+                            vid.volume = 0.15; // low background audio so narration is clear
+                            try { await vid.play(); } catch (e) { /* autoplay may be blocked */ }
                           }
-                          window.speechSynthesis.speak(utter);
+
+                          // Start narration after a brief pause
+                          const utter = new SpeechSynthesisUtterance(allText);
+                          utter.rate = 0.9;
+                          utter.pitch = 1.0;
+                          utter.volume = 1.0;
+
                           utter.onend = () => {
-                            if (vid && !vid.paused) vid.pause();
+                            // Stop video looping and let it finish current playback
+                            if (vid) {
+                              vid.loop = false;
+                              // Fade out after a short grace period
+                              setTimeout(() => {
+                                if (vid && !vid.paused) vid.pause();
+                              }, 2000);
+                            }
                           };
+
+                          utter.onerror = () => {
+                            if (vid) vid.loop = false;
+                          };
+
+                          window.speechSynthesis.speak(utter);
                         }}
                       >
                         ▶ Play Video with Full Narration
@@ -969,7 +1000,7 @@ function App() {
                       </button>
                     </div>
                     <p className="mt-1 text-[10px] text-white/30">
-                      Video plays muted by default. Click "Play Video with Full Narration" to hear the complete voiceover synced to the visuals.
+                      Click "Play Video with Full Narration" to hear all campaign text narrated over the video. The video loops until narration finishes, then stops.
                     </p>
                   </div>
                 )}

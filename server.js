@@ -426,7 +426,7 @@ app.post('/api/generate-campaign', async (req, res) => {
     sendEvent('run', { runId });
     sendEvent('status', { message: 'Creative Director is thinking...' });
     sendEvent('step', { step: 'brief', message: 'Extracting brand brief...' });
-    sendEvent('director_note', { message: 'I'm extracting brand voice, audience, and constraints so the output feels like one cohesive creative direction.' });
+    sendEvent('director_note', { message: 'I am extracting brand voice, audience, and constraints so the output feels like one cohesive creative direction.' });
 
     const briefPrompt = `Extract a structured brand brief from the user input. Return ONLY valid JSON with keys:
 {
@@ -606,7 +606,7 @@ Make the text and images feel like one cohesive creative brief. Reference colors
 
     // ── Agentic QA pass + optional auto-revision ──
     sendEvent('step', { step: 'qa', message: 'Quality-checking cohesion and compliance...' });
-    sendEvent('director_note', { message: 'I'm reviewing cohesion (tone + visuals) and checking constraints before finalizing.' });
+    sendEvent('director_note', { message: 'I am reviewing cohesion (tone + visuals) and checking constraints before finalizing.' });
 
     const qaPrompt = `You are a strict Creative Director QA reviewer.
 Return ONLY valid JSON:
